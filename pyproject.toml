@@ -19,9 +19,25 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "pytest-mock",
     "responses",
 ]
+
+[project.urls]
+Homepage = "https://github.com/CoutureTec/czar-nm"
+Repository = "https://github.com/CoutureTec/czar-nm"
+Issues = "https://github.com/CoutureTec/czar-nm/issues"
+Changelog = "https://github.com/CoutureTec/czar-nm/blob/main/CHANGELOG.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["czarnm"]
+
+[tool.coverage.report]
+show_missing = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
