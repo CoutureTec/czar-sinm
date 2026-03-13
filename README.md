@@ -5,6 +5,7 @@ Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola 
 Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema ZarcNM.
 
 Há exemplos de uso com fonte de dados interna e arquivos.
+→ [Veja exemplos](exemplos/README.md)
 
 ## Pré-requisitos
 
@@ -12,17 +13,12 @@ Há exemplos de uso com fonte de dados interna e arquivos.
 
 ## Instalação
 
-**Via GitHub (recomendado):**
+**Via GitHub com tag (recomendado):**
 
 ```bash
-pip install git+https://github.com/CoutureTec/czar-nm.git
+pip install git+https://github.com/CoutureTec/czar-nm.git@v1.0.0
 ```
 
-Versão específica (tag):
-
-```bash
-pip install git+https://github.com/CoutureTec/czar-nm.git@v0.1.0
-```
 
 ## Estrutura da biblioteca
 
