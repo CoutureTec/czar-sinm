@@ -69,6 +69,8 @@ client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 
 ## Tratamento de erros
 
+Os erros retornados pelas chamadas à api são logados de forma a tornar mais claro o possível a sua causa, baseado na documentação da API do Zarcnm.
+
 ```python
 from czarnm.exceptions import (
     AuthenticationError,
@@ -98,6 +100,7 @@ except APIError as e:
 ```
 
 ### Exemplo de relatório de erro 403
+
 
 ```
 ╔════════════════════════════════════════════════════════════╗
