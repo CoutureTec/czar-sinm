@@ -30,11 +30,11 @@ API_URLS = {
 
 # Roles exigidos por prefixo de endpoint (ordem: mais específico primeiro)
 _ENDPOINT_ROLES = [
-    ("/api/v1/glebas",                  ["OPERADOR_CONTRATOS", "BETA_USER", "ADMINISTRADOR"]),
-    ("/api/v1/operacoes",               ["OPERADOR_CONTRATOS", "BETA_USER", "ADMINISTRADOR"]),
-    ("/api/v1/classificacoes",          ["OPERADOR_CONTRATOS", "BETA_USER", "ADMINISTRADOR"]),
-    ("/api/v1/analises-solo",           ["OPERADOR_ANALISE_SOLO", "BETA_USER", "ADMINISTRADOR"]),
-    ("/api/v1/sensoriamentos-remotos",  ["OPERADOR_SENSORIAMENTO_REMOTO", "BETA_USER", "ADMINISTRADOR"]),
+    ("/api/v1/glebas",                  ["OPERADOR_CONTRATOS"]),
+    ("/api/v1/operacoes",               ["OPERADOR_CONTRATOS"]),
+    ("/api/v1/classificacoes",          ["OPERADOR_CONTRATOS",]),
+    ("/api/v1/analises-solo",           ["OPERADOR_ANALISE_SOLO"]),
+    ("/api/v1/sensoriamentos-remotos",  ["OPERADOR_SENSORIAMENTO_REMOTO"]),
 ]
 
 
