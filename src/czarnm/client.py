@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 # URLs padrão por ambiente
 API_URLS = {    
-    "hml": "https://www.zarcnm-h.cnptia.embrapa.br/",
-    "prd": "https://www.zarcnm.cnptia.embrapa.br/",
+    "hml": "https://www.zarcnm-h.cnptia.embrapa.br",
+    "prd": "https://www.zarcnm.cnptia.embrapa.br",
 }
 
 # Roles exigidos por prefixo de endpoint (ordem: mais específico primeiro)
