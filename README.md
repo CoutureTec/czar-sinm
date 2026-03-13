@@ -1,6 +1,10 @@
-# czarnm — Cliente Python para o ZARC Nível de Manejo
+# czarnm — Cliente ZARC Nível de Manejo 
 
-Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola de Risco Climático — Nível de Manejo), desenvolvida pela Embrapa.
+Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola de Risco Climático — Nível de Manejo).
+
+Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema ZarcNM.
+
+Há exemplos de uso com fonte de dados interna e arquivos.
 
 ## Pré-requisitos
 
