@@ -5,7 +5,6 @@ Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola 
 ## Pré-requisitos
 
 - Python 3.8+
-- Credenciais de acesso ao ZARC-NM (usuário, senha, client ID e client secret fornecidos pela equipe ZARC-NM)
 
 ## Instalação
 
