@@ -86,9 +86,11 @@ class PermissaoError(APIError):
         status_code: int,
         message: str,
         body: Optional[dict] = None,
+        endpoint: str = "",
         roles_usuario: Optional[list] = None,
         roles_necessarios: Optional[list] = None,
     ):
+        self.endpoint = endpoint
         self.roles_usuario = roles_usuario or []
         self.roles_necessarios = roles_necessarios or []
         super().__init__(status_code, message, body)
@@ -104,13 +106,16 @@ class PermissaoError(APIError):
 
         lines = [
             f"╔{'═' * (W - 2)}╗",
-            row("ACESSO NEGADO — ZARC-NM"),
+            row("ACESSO NEGADO — ZARC-NM (HTTP 403)"),
             divider(),
-            row(f"Status   : {self.status_code}"),
-            divider(),
-            row("Roles do usuário:"),
         ]
 
+        if self.endpoint:
+            lines.append(row(f"Endpoint : {self.endpoint}"))
+            lines.append(divider())
+
+        # Roles que o usuário possui
+        lines.append(row("Roles do usuário:"))
         if self.roles_usuario:
             for r in sorted(self.roles_usuario):
                 lines.append(row(f"  • {r}"))
@@ -118,18 +123,25 @@ class PermissaoError(APIError):
             lines.append(row("  (nenhum role encontrado no token)"))
 
         lines.append(divider())
-        lines.append(row("Roles necessários para este endpoint:"))
-        for r in sorted(self.roles_necessarios):
-            tem = "✓" if r in self.roles_usuario else "✗"
-            lines.append(row(f"  {tem} {r}"))
 
-        lines.append(divider())
-        linhas_orientacao = [
-            "Solicite à equipe ZARC-NM a atribuição",
-            "de um dos roles marcados com ✗.",
-        ]
-        for l in linhas_orientacao:
-            lines.append(row(l))
+        # Roles exigidos por este endpoint, marcando quais faltam
+        if self.roles_necessarios:
+            lines.append(row(f"Roles aceitos por '{self.endpoint}':"))
+            faltam = []
+            for r in sorted(self.roles_necessarios):
+                if r in self.roles_usuario:
+                    lines.append(row(f"  ✓ {r}  ← você possui este role"))
+                else:
+                    lines.append(row(f"  ✗ {r}"))
+                    faltam.append(r)
+
+            if faltam:
+                lines.append(divider())
+                lines.append(row("Solicite à equipe ZARC-NM um dos roles acima"))
+                lines.append(row("marcados com ✗ para seu usuário no Keycloak."))
+        else:
+            lines.append(row("Roles necessários não identificados."))
+            lines.append(row("Verifique as permissões com a equipe ZARC-NM."))
 
         lines.append(f"╚{'═' * (W - 2)}╝")
         return "\n".join(lines)

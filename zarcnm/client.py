@@ -151,7 +151,7 @@ class ZarcNMClient:
         """Busca os dados de uma gleba pelo UUID."""
         return self._get(f"/api/v1/glebas/{uuid_gleba}")
 
-    def listar_glebas(self) -> list[dict]:
+    def listar_glebas(self) -> list:
         """Lista as glebas do usuário autenticado."""
         return self._get("/api/v1/glebas")
 
@@ -191,7 +191,7 @@ class ZarcNMClient:
         """Busca uma análise de solo pelo UUID."""
         return self._get(f"/api/v1/analises-solo/{uuid_analise}")
 
-    def listar_analises_solo(self) -> list[dict]:
+    def listar_analises_solo(self) -> list:
         """Lista as análises de solo do usuário autenticado."""
         return self._get("/api/v1/analises-solo")
 
@@ -229,7 +229,7 @@ class ZarcNMClient:
         """Busca um sensoriamento remoto pelo UUID."""
         return self._get(f"/api/v1/sensoriamentos-remotos/{uuid_sensoriamento}")
 
-    def listar_sensoriamentos_remotos(self) -> list[dict]:
+    def listar_sensoriamentos_remotos(self) -> list:
         """Lista os sensoriamentos do usuário autenticado."""
         return self._get("/api/v1/sensoriamentos-remotos")
 
@@ -283,7 +283,7 @@ class ZarcNMClient:
         """
         return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}")
 
-    def listar_classificacoes(self) -> list[dict]:
+    def listar_classificacoes(self) -> list:
         """Lista todas as classificações do usuário autenticado."""
         return self._get("/api/v1/classificacoes")
 
@@ -314,7 +314,7 @@ class ZarcNMClient:
 
         return self._handle_response(resp, path)
 
-    def _get(self, path: str) -> dict | list:
+    def _get(self, path: str):
         url = self._base_url + path
         logger.debug("GET %s", url)
         try:
@@ -352,6 +352,7 @@ class ZarcNMClient:
                 resp.status_code,
                 message,
                 body,
+                endpoint=path,
                 roles_usuario=roles_usuario,
                 roles_necessarios=roles_necessarios,
             )
