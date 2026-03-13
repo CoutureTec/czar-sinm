@@ -17,8 +17,7 @@ from .exceptions import AuthenticationError
 logger = logging.getLogger(__name__)
 
 # Realm por ambiente
-REALMS = {
-    "dev": "zarcnm-d",
+REALMS = {    
     "hml": "zarcnm-h",
     "prd": "zarcnm"    
 }
