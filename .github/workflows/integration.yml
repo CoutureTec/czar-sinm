@@ -22,12 +22,17 @@ jobs:
     name: Exemplos contra API hml
     runs-on: ubuntu-latest
 
-    # Pula silenciosamente se os secrets não estiverem configurados
-    # (ex: PRs de forks externos onde secrets não são repassados)
-    if: ${{ secrets.ZARCNM_USERNAME != '' }}
-
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verificar se secrets estão disponíveis
+        env:
+          SECRET: ${{ secrets.ZARCNM_USERNAME }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::Secrets não configurados. Configure ZARCNM_USERNAME, ZARCNM_PASSWORD, ZARCNM_CLIENT_ID e ZARCNM_CLIENT_SECRET em Settings → Secrets and variables → Actions."
+            exit 1
+          fi
 
       - name: Configurar Python
         uses: actions/setup-python@v5
