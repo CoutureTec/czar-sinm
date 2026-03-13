@@ -53,11 +53,11 @@ Cada endpoint exige que o usuário possua ao menos um dos roles abaixo:
 
 | Endpoint | Roles aceitos |
 |---|---|
-| `POST /api/v1/glebas` | `OPERADOR_CONTRATOS`, `BETA_USER`, `ADMINISTRADOR` |
-| `POST /api/v1/analises-solo/{chave}` | `OPERADOR_ANALISE_SOLO`, `BETA_USER`, `ADMINISTRADOR` |
-| `POST /api/v1/sensoriamentos-remotos/{chave}` | `OPERADOR_SENSORIAMENTO_REMOTO`, `BETA_USER`, `ADMINISTRADOR` |
-| `POST /api/v1/operacoes` | `OPERADOR_CONTRATOS`, `BETA_USER`, `ADMINISTRADOR` |
-| `GET  /api/v1/classificacoes/{chave}` | `OPERADOR_CONTRATOS`, `BETA_USER`, `ADMINISTRADOR` |
+| `POST /api/v1/glebas` | `OPERADOR_CONTRATOS` |
+| `POST /api/v1/analises-solo/{chave}` | `OPERADOR_ANALISE_SOLO` |
+| `POST /api/v1/sensoriamentos-remotos/{chave}` | `OPERADOR_SENSORIAMENTO_REMOTO` |
+| `POST /api/v1/operacoes` | `OPERADOR_CONTRATOS` |
+| `GET  /api/v1/classificacoes/{chave}` | `OPERADOR_CONTRATOS` |
 
 Em caso de 403, o cliente exibe automaticamente os roles do usuário e quais estão faltando. Solicite a atribuição do role adequado à equipe ZARC-NM.
 
@@ -258,3 +258,9 @@ except APIError as e:
 ║    • talhao.area                  → deve ser positivo      ║
 ╚════════════════════════════════════════════════════════════╝
 ```
+
+## Licença
+
+Distribuído sob a [MIT License](LICENSE).
+
+Direitos autorais (c) 2025 CoutureTec — Alfaiataria de Software - www.couturetec.com.br
