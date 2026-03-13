@@ -4,8 +4,19 @@ Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola 
 
 Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema ZarcNM.
 
-Há exemplos de uso com fonte de dados interna e arquivos.
-→ [Veja exemplos](exemplos/README.md)
+Há exemplos de uso com fonte de dados interna e arquivos. → [Veja os exemplos de uso](exemplos/README.md)
+
+
+# Motivação de usar uma biblioteca pública 
+
+Integrar com o ZARC-NM envolve **autenticação OAuth2** com renovação automática de token, serialização de **payloads complexos**, tratamento diferenciado de erros por tipo (validação, permissão, recurso não encontrado) e um **fluxo de múltiplas etapas** com dependências entre si. Implementar tudo isso do zero em cada projeto **consome dias de desenvolvimento** e gera código duplicado, frágil e difícil de manter.
+
+O `czarnm` encapsula toda essa complexidade em uma interface de alto nível: **com poucas linhas de código** seu time já está enviando glebas, análises de solo e sensoriamentos, sem precisar conhecer os detalhes do protocolo Keycloak nem a estrutura interna da API.
+
+Por ser **open-source**, a biblioteca se beneficia de múltiplos olhares: bugs são identificados mais cedo, edge cases reportados por outros integradores viram correções que todos aproveitam, e o código passa por revisão pública contínua — o que resulta em uma base mais confiável do que qualquer implementação proprietária isolada.
+
+Há exemplos de uso com dados embutidos no código e com dados em arquivos CSV.
+→ [Veja os exemplos](exemplos/README.md)
 
 ## Pré-requisitos
 
