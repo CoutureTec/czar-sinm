@@ -136,7 +136,7 @@ class TestPermissaoError:
     def test_format_report_contem_cabecalho(self):
         report = self._make().format_report()
         assert "ACESSO NEGADO" in report
-        assert "403" not in report  # header não tem status, mas tem título
+        assert "HTTP 403" in report
 
     def test_format_report_mostra_endpoint(self):
         report = self._make(endpoint="/api/v1/analises-solo/CHAVE").format_report()
