@@ -52,7 +52,7 @@ class ZarcNMClient:
 
     Exemplo de uso::
 
-        from zarcnm import ZarcNMClient
+        from czarnm import ZarcNMClient
 
         client = ZarcNMClient(
             username="meu.usuario@embrapa.br",

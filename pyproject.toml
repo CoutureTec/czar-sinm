@@ -3,10 +3,14 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "zarcnm"
+name = "czarnm"
 version = "0.1.0"
-description = "Cliente Python para a API ZARC Nível de Manejo (ZARC-NM / Embrapa)"
+description = "Czarnm — Cliente Python para a API ZARC Nível de Manejo (ZARC-NM / Embrapa)"
 requires-python = ">=3.8"
+license = {file = "LICENSE"}
+authors = [
+    {name = "CoutureTec", email = "contato@couturetec.com.br"},
+]
 dependencies = [
     "requests>=2.28",
     "python-dotenv>=0.19",
@@ -20,5 +24,5 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["zarcnm*"]
+where = ["src"]
+include = ["czarnm*"]

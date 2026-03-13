@@ -1,5 +1,5 @@
 """
-zarcnm - Cliente Python para a API ZARC Nível de Manejo (ZARC-NM)
+czarnm — Cliente ZARC-NM: Cliente Python para a API ZARC Nível de Manejo
 """
 
 from .client import ZarcNMClient

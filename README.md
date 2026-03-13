@@ -1,4 +1,4 @@
-# zarcnm — Cliente Python para o ZARC Nível de Manejo
+# czarnm — Cliente Python para o ZARC Nível de Manejo
 
 Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola de Risco Climático — Nível de Manejo), desenvolvida pela Embrapa.
 
@@ -9,7 +9,22 @@ Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola 
 
 ## Instalação
 
+**Via GitHub (recomendado):**
+
 ```bash
+pip install git+https://github.com/CoutureTec/czar-nm.git
+```
+
+Versão específica (tag):
+
+```bash
+pip install git+https://github.com/CoutureTec/czar-nm.git@v0.1.0
+```
+
+**A partir do código-fonte (modo desenvolvimento):**
+
+```bash
+git clone https://github.com/CoutureTec/czar-nm.git czar-client
 cd czar-client
 pip install -e .
 ```
@@ -150,7 +165,7 @@ Total de glebas: 1
 ## Estrutura da biblioteca
 
 ```
-zarcnm/
+src/czarnm/
 ├── client.py       # ZarcNMClient — métodos principais + diagnóstico de 403
 ├── auth.py         # Autenticação Keycloak com cache e renovação de token
 ├── models.py       # Dataclasses para os payloads da API
@@ -160,7 +175,7 @@ zarcnm/
 ## Referência rápida da API
 
 ```python
-from zarcnm import ZarcNMClient
+from czarnm import ZarcNMClient
 
 client = ZarcNMClient(
     username="...", password="...",
@@ -197,7 +212,7 @@ client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 ## Tratamento de erros
 
 ```python
-from zarcnm.exceptions import (
+from czarnm.exceptions import (
     AuthenticationError,
     PermissaoError,
     ValidationError,

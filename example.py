@@ -1,5 +1,5 @@
 """
-Exemplo de uso da biblioteca zarcnm.
+Exemplo de uso da biblioteca czarnm.
 
 Uso:
     python example.py                                          # fluxo completo
@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from zarcnm import (
+from czarnm import (
     ZarcNMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
@@ -29,7 +29,7 @@ from zarcnm import (
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
     DadosInput,
 )
-from zarcnm.exceptions import ZarcNMError, NotFoundError, APIError, PermissaoError
+from czarnm.exceptions import ZarcNMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
     "cadastraGleba",
