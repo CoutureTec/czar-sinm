@@ -1,7 +1,26 @@
+# Credenciais — nunca versionar
 .env
+.env.*
+
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
+
+# Build
 dist/
 build/
+
+# Ambientes virtuais
 .venv/
+venv/
+env/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/

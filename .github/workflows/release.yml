@@ -108,3 +108,36 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+
+  # ------------------------------------------------------------------
+  # 4. Publica no PyPI — só executa após a release ser criada
+  #
+  # Usa Trusted Publisher (OIDC) — sem API token armazenado como secret.
+  # Configuração única no PyPI:
+  #   pypi.org → Account → Publishing → Add trusted publisher
+  #   owner: CoutureTec | repo: czar-nm | workflow: release.yml | env: pypi
+  # ------------------------------------------------------------------
+  pypi:
+    name: Publicar no PyPI
+    runs-on: ubuntu-latest
+    needs: [release]
+    environment: pypi
+
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar build
+        run: pip install build
+
+      - name: Construir pacote
+        run: python -m build
+
+      - name: Publicar no PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
