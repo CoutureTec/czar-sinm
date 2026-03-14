@@ -1,4 +1,4 @@
-# czarnm — Cliente da API do SiNM
+# czarsinm — Cliente da API do SiNM
 
 [![CI](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml)
 
@@ -13,7 +13,7 @@ Há exemplos de uso com fonte de dados interna e arquivos. → [Veja os exemplos
 
 Integrar com o SiNM envolve **autenticação OAuth2** com renovação automática de token, serialização de **payloads complexos**, tratamento diferenciado de erros por tipo (validação, permissão, recurso não encontrado) e um **fluxo de múltiplas etapas** com dependências entre si. Implementar tudo isso do zero em cada projeto **consome dias de desenvolvimento** e gera código duplicado, frágil e difícil de manter.
 
-O `czarnm` encapsula toda essa complexidade em uma interface de alto nível: **com poucas linhas de código** seu time já está enviando glebas, análises de solo e sensoriamentos, sem precisar conhecer os detalhes do protocolo Keycloak nem a estrutura interna da API.
+O `czarsinm` encapsula toda essa complexidade em uma interface de alto nível: **com poucas linhas de código** seu time já está enviando glebas, análises de solo e sensoriamentos, sem precisar conhecer os detalhes do protocolo Keycloak nem a estrutura interna da API.
 
 Por ser **open-source**, a biblioteca se beneficia de múltiplos olhares: bugs são identificados mais cedo, edge cases reportados por outros integradores viram correções que todos aproveitam, e o código passa por revisão pública contínua — o que resulta em uma base mais confiável do que qualquer implementação proprietária isolada.
 
@@ -36,7 +36,7 @@ pip install git+https://github.com/CoutureTec/czar-sinm.git@v1.0.0
 ## Estrutura da biblioteca
 
 ```
-src/czarnm/
+src/czarsinm/
 ├── client.py       # SINMClient — métodos principais + diagnóstico de 403
 ├── auth.py         # Autenticação Keycloak com cache e renovação de token
 ├── models.py       # Dataclasses para os payloads da API
@@ -46,7 +46,7 @@ src/czarnm/
 ## Referência rápida da API
 
 ```python
-from czarnm import SINMClient
+from czarsinm import SINMClient
 
 client = SINMClient(
     username="...", password="...",
@@ -85,7 +85,7 @@ client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 Os erros retornados pelas chamadas à api são logados de forma a tornar mais claro o possível a sua causa, baseado na documentação da API do SiNM.
 
 ```python
-from czarnm.exceptions import (
+from czarsinm.exceptions import (
     AuthenticationError,
     PermissaoError,
     ValidationError,

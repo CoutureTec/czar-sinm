@@ -2,7 +2,7 @@
 
 import pytest
 
-from czarnm.exceptions import (
+from czarsinm.exceptions import (
     APIError,
     AuthenticationError,
     NotFoundError,

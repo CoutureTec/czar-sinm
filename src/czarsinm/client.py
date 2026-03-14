@@ -51,7 +51,7 @@ class SINMClient:
 
     Exemplo de uso::
 
-        from czarnm import SINMClient
+        from czarsinm import SINMClient
 
         client = SINMClient(
             username="meu.usuario@embrapa.br",

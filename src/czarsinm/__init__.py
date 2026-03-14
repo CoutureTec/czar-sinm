@@ -1,5 +1,5 @@
 """
-czarnm — Cliente SiNM: Cliente Python para a API SiNM (Sistema de Informações de Níveis de Manejo)
+czarsinm — Cliente SiNM: Cliente Python para a API SiNM (Sistema de Informações de Níveis de Manejo)
 """
 
 from .client import SINMClient

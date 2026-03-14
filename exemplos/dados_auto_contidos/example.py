@@ -1,5 +1,5 @@
 """
-Exemplo de uso da biblioteca czarnm.
+Exemplo de uso da biblioteca czarsinm.
 
 Uso:
     python example.py                                          # fluxo completo
@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from czarnm import (
+from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
@@ -29,7 +29,7 @@ from czarnm import (
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
     DadosInput,
 )
-from czarnm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
+from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
     "cadastraGleba",

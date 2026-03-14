@@ -1,6 +1,6 @@
 # Exemplo: dados externos em arquivos CSV
 
-Este exemplo demonstra o uso da biblioteca `czarnm` lendo os dados de entrada a partir de **arquivos CSV organizados em diretórios**. Cada processo (talhão/gleba a ser classificado) tem seu próprio subdiretório com um CSV por entidade. Os resultados de cada etapa são gravados no arquivo `resultado.csv` dentro do mesmo diretório, permitindo retomar o fluxo em execuções separadas.
+Este exemplo demonstra o uso da biblioteca `czarsinm` lendo os dados de entrada a partir de **arquivos CSV organizados em diretórios**. Cada processo (talhão/gleba a ser classificado) tem seu próprio subdiretório com um CSV por entidade. Os resultados de cada etapa são gravados no arquivo `resultado.csv` dentro do mesmo diretório, permitindo retomar o fluxo em execuções separadas.
 
 Diferente do exemplo `dados_auto_contidos`, aqui **nenhum dado está codificado no script** — tudo vem dos arquivos CSV, tornando o exemplo adequado para integrar com sistemas que exportam dados de talhões, análises e sensoriamento.
 

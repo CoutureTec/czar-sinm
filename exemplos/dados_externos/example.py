@@ -1,5 +1,5 @@
 """
-Exemplo de uso da biblioteca czarnm com dados lidos de arquivos CSV.
+Exemplo de uso da biblioteca czarsinm com dados lidos de arquivos CSV.
 
 Uso:
     python example.py --dados dados/processo_001                                     # fluxo completo
@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from czarnm import (
+from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
@@ -30,7 +30,7 @@ from czarnm import (
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
 )
-from czarnm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
+from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
     "cadastraGleba",

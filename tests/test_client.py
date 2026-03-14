@@ -3,9 +3,9 @@
 import pytest
 import responses as rsps_lib
 
-from czarnm import SINMClient
-from czarnm.client import API_URLS, _roles_para_endpoint
-from czarnm.exceptions import APIError, NotFoundError, PermissaoError, ValidationError
+from czarsinm import SINMClient
+from czarsinm.client import API_URLS, _roles_para_endpoint
+from czarsinm.exceptions import APIError, NotFoundError, PermissaoError, ValidationError
 
 BASE = API_URLS["hml"]
 
@@ -45,7 +45,7 @@ class TestInit:
 
     def test_base_url_prd(self, fake_token):
         from unittest.mock import MagicMock
-        from czarnm.auth import KeycloakAuth
+        from czarsinm.auth import KeycloakAuth
         c = SINMClient(
             username="u", password="p", client_id="c", client_secret="s",
             ambiente="prd",

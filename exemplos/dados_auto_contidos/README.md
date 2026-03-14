@@ -1,6 +1,6 @@
 # Exemplo: dados auto-contidos
 
-Este exemplo demonstra o uso completo da biblioteca `czarnm` sem nenhuma dependência de arquivos externos. Todos os dados de talhão, amostras de solo, índices de sensoriamento remoto, produtor e propriedade estão **codificados diretamente no script Python** — ideal para testar a integração rapidamente ou entender o fluxo da API sem precisar preparar arquivos de entrada.
+Este exemplo demonstra o uso completo da biblioteca `czarsinm` sem nenhuma dependência de arquivos externos. Todos os dados de talhão, amostras de solo, índices de sensoriamento remoto, produtor e propriedade estão **codificados diretamente no script Python** — ideal para testar a integração rapidamente ou entender o fluxo da API sem precisar preparar arquivos de entrada.
 
 ## Pré-requisitos
 

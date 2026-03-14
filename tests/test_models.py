@@ -2,7 +2,7 @@
 
 import pytest
 
-from czarnm import (
+from czarsinm import (
     Amostra,
     AnaliseSolo,
     CoberturaSolo,
@@ -21,7 +21,7 @@ from czarnm import (
     Talhao,
     TipoOperacao,
 )
-from czarnm.models import _remove_none
+from czarsinm.models import _remove_none
 
 
 # ---------------------------------------------------------------------------

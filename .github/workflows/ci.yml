@@ -31,4 +31,4 @@ jobs:
         run: pytest --tb=short -q
 
       - name: Relatório de cobertura
-        run: pytest --tb=short -q --cov=czarnm --cov-report=term-missing
+        run: pytest --tb=short -q --cov=czarsinm --cov-report=term-missing

@@ -1,4 +1,4 @@
-# Contribuindo com o czarnm
+# Contribuindo com o czarsinm
 
 Obrigado pelo interesse em contribuir! Este documento descreve o processo para reportar problemas, propor melhorias e enviar código.
 
@@ -41,7 +41,7 @@ pytest
 ## Estrutura do projeto
 
 ```
-src/czarnm/
+src/czarsinm/
 ├── client.py       # SINMClient — métodos públicos da API
 ├── auth.py         # Autenticação Keycloak com cache de token
 ├── models.py       # Dataclasses dos payloads

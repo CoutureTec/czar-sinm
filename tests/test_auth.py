@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from czarnm.auth import KeycloakAuth, KEYCLOAK_BASE, REALMS
-from czarnm.exceptions import AuthenticationError
+from czarsinm.auth import KeycloakAuth, KEYCLOAK_BASE, REALMS
+from czarsinm.exceptions import AuthenticationError
 
 
 def _make_token_response(roles=None, expires_in=300, refresh_expires_in=1800):
@@ -104,7 +104,7 @@ class TestAuthenticate:
         mock_resp.status_code = 200
         mock_resp.json.return_value = token_resp
 
-        with patch("czarnm.auth.requests.post", return_value=mock_resp) as mock_post:
+        with patch("czarsinm.auth.requests.post", return_value=mock_resp) as mock_post:
             auth._authenticate()
 
         mock_post.assert_called_once()
@@ -118,14 +118,14 @@ class TestAuthenticate:
         mock_resp.status_code = 401
         mock_resp.text = "Unauthorized"
 
-        with patch("czarnm.auth.requests.post", return_value=mock_resp):
+        with patch("czarsinm.auth.requests.post", return_value=mock_resp):
             with pytest.raises(AuthenticationError, match="401"):
                 auth._authenticate()
 
     def test_erro_conexao_levanta_authentication_error(self):
         import requests as req
         auth = _make_auth()
-        with patch("czarnm.auth.requests.post", side_effect=req.ConnectionError("timeout")):
+        with patch("czarsinm.auth.requests.post", side_effect=req.ConnectionError("timeout")):
             with pytest.raises(AuthenticationError, match="Keycloak"):
                 auth._authenticate()
 

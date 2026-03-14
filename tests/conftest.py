@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from czarnm import (
+from czarsinm import (
     SINMClient,
     Amostra,
     AnaliseSolo,
@@ -26,7 +26,7 @@ from czarnm import (
     Talhao,
     TipoOperacao,
 )
-from czarnm.auth import KeycloakAuth
+from czarsinm.auth import KeycloakAuth
 
 BASE_URL_HML = "https://www.zarcnm-h.cnptia.embrapa.br/zarcnm"
 
