@@ -1,6 +1,7 @@
 name: Testes de Integração
 
-# Executa os exemplos contra a API real (ambiente hml).
+# Executa os passos do fluxo SiNM contra a API real (ambiente hml),
+# um step por operação para facilitar o diagnóstico de falhas.
 #
 # ATENÇÃO: secrets não são repassados em PRs de forks externos — apenas
 # para branches do próprio repositório. PRs de forks serão ignorados.
@@ -19,7 +20,7 @@ on:
 
 jobs:
   integration:
-    name: Exemplos contra API hml
+    name: Fluxo SiNM contra API hml
     runs-on: ubuntu-latest
 
     steps:
@@ -42,36 +43,63 @@ jobs:
       - name: Instalar dependências
         run: pip install -e ".[dev]"
 
-      - name: Criar .env para dados_auto_contidos
+      - name: Criar .env
         run: |
-          cat > exemplos/dados_auto_contidos/.env <<EOF
+          cat > exemplos/dados_auto_contidos/.env <<ENVEOF
           SINM_AMBIENTE=hml
           SINM_USERNAME=${{ secrets.SINM_USERNAME }}
           SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
           SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
           SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
-          EOF
+          ENVEOF
 
-      - name: Criar .env para dados_externos
-        run: |
-          cat > exemplos/dados_externos/.env <<EOF
-          SINM_AMBIENTE=hml
-          SINM_USERNAME=${{ secrets.SINM_USERNAME }}
-          SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
-          SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
-          SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
-          EOF
-
-      - name: Exemplo dados_auto_contidos — fluxo completo
+      # ------------------------------------------------------------------
+      # Passo 1 — Autenticação
+      # ------------------------------------------------------------------
+      - name: "1 · Autenticação"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py
+        run: python example.py --acao autenticacao
 
-      - name: Exemplo dados_externos — fluxo completo
-        working-directory: exemplos/dados_externos
-        run: python example.py --dados dados/processo_001
+      # ------------------------------------------------------------------
+      # Passo 2 — Listagem de talhões
+      # ------------------------------------------------------------------
+      - name: "2 · Listar talhões"
+        working-directory: exemplos/dados_auto_contidos
+        run: python example.py --acao listarGlebas
 
-      - name: Limpar arquivos .env
-        if: always()
+      # ------------------------------------------------------------------
+      # Passo 3 — Cadastro de talhão/gleba → captura chave_nm
+      # ------------------------------------------------------------------
+      - name: "3 · Cadastrar talhão/gleba"
+        id: cadastra_gleba
+        working-directory: exemplos/dados_auto_contidos
         run: |
-          rm -f exemplos/dados_auto_contidos/.env
-          rm -f exemplos/dados_externos/.env
+          OUTPUT=$(python example.py --acao cadastraGleba)
+          echo "$OUTPUT"
+          CHAVE_NM=$(echo "$OUTPUT" | grep "^CHAVE_NM=" | cut -d= -f2)
+          echo "chave_nm=$CHAVE_NM" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------
+      # Passo 4 — Análise de solo
+      # ------------------------------------------------------------------
+      - name: "4 · Cadastrar análise de solo"
+        working-directory: exemplos/dados_auto_contidos
+        run: python example.py --acao cadastraAnaliseSolo --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+
+      # ------------------------------------------------------------------
+      # Passo 5 — Sensoriamento remoto
+      # ------------------------------------------------------------------
+      - name: "5 · Cadastrar sensoriamento remoto"
+        working-directory: exemplos/dados_auto_contidos
+        run: python example.py --acao cadastraSensoriamentoRemoto --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+
+      # ------------------------------------------------------------------
+      # Passo 6 — Consulta da classificação
+      # ------------------------------------------------------------------
+      - name: "6 · Consultar classificação NM"
+        working-directory: exemplos/dados_auto_contidos
+        run: python example.py --acao consultaClassificacaoNM --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+
+      - name: Limpar .env
+        if: always()
+        run: rm -f exemplos/dados_auto_contidos/.env

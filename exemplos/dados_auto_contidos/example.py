@@ -3,6 +3,8 @@ Exemplo de uso da biblioteca czarsinm.
 
 Uso:
     python example.py                                          # fluxo completo
+    python example.py --acao autenticacao
+    python example.py --acao listarGlebas
     python example.py --acao cadastraGleba
     python example.py --acao cadastraAnaliseSolo   --chave_nm CHAVE
     python example.py --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
@@ -32,6 +34,8 @@ from czarsinm import (
 from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
+    "autenticacao",
+    "listarGlebas",
     "cadastraGleba",
     "cadastraAnaliseSolo",
     "cadastraSensoriamentoRemoto",
@@ -42,7 +46,7 @@ ACOES = (
 # Argumentos de linha de comando
 # --------------------------------------------------------------------------
 parser = argparse.ArgumentParser(
-    description="Exemplo de integração com a API SINM.",
+    description="Exemplo de integração com a API SiNM.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 parser.add_argument(
@@ -51,6 +55,8 @@ parser.add_argument(
     default=None,
     help=(
         "Ação a executar. Se omitido, executa o fluxo completo.\n"
+        "  autenticacao\n"
+        "  listarGlebas\n"
         "  cadastraGleba\n"
         "  cadastraAnaliseSolo          (requer --chave_nm)\n"
         "  cadastraSensoriamentoRemoto  (requer --chave_nm)\n"
@@ -100,11 +106,6 @@ client = SINMClient(
     client_secret=CLIENT_SECRET,
     ambiente=AMBIENTE,
 )
-
-print("\n=== Autenticação ===")
-roles = client.roles
-print(f"Usuário : {USUARIO}")
-print(f"Roles   : {roles}")
 
 # --------------------------------------------------------------------------
 # Payloads de exemplo (reutilizados pelas funções abaixo)
@@ -252,21 +253,48 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
 # Ações individuais
 # --------------------------------------------------------------------------
 
-def cadastra_gleba():
+def autenticacao() -> None:
+    print("\n=== Autenticação ===")
+    roles = client.roles
+    print(f"Usuário : {USUARIO}")
+    print(f"Roles   : {roles}")
+    if not roles:
+        print("ERRO: nenhum role encontrado no token.", file=sys.stderr)
+        sys.exit(1)
+
+
+def listar_glebas() -> None:
+    print("\n=== Listando glebas cadastradas ===")
+    try:
+        glebas = client.listar_glebas()
+        total = len(glebas) if isinstance(glebas, list) else "?"
+        print(f"Total de glebas: {total}")
+    except PermissaoError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+    except APIError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+
+
+def cadastra_gleba() -> str:
     """Cadastra gleba e retorna a chaveClassificacaoNM."""
     print("\n=== Cadastrando talhão/gleba ===")
     try:
         resp = client.cadastrar_gleba(_dado_gleba())
+        chave = resp.get("chaveClassificacaoNM")
         print("Gleba cadastrada com sucesso!")
         print(f"  UUID              : {resp.get('uuid')}")
-        print(f"  Chave Classificação NM: {resp.get('chaveClassificacaoNM')}")
-        return resp.get("chaveClassificacaoNM")
+        print(f"  Chave Classificação NM: {chave}")
+        # Linha parsável para captura em CI (ex: GitHub Actions)
+        print(f"CHAVE_NM={chave}")
+        return chave
     except PermissaoError as exc:
-        print(exc.format_report())
-        return None
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
     except APIError as exc:
-        print(exc.format_report())
-        return None
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
 
 
 def cadastra_analise_solo(chave_nm: str) -> None:
@@ -276,9 +304,11 @@ def cadastra_analise_solo(chave_nm: str) -> None:
         print("Análise de solo cadastrada com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
     except PermissaoError as exc:
-        print(exc.format_report())
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
     except APIError as exc:
-        print(exc.format_report())
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
 
 
 def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
@@ -290,9 +320,11 @@ def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
         print("Sensoriamento remoto cadastrado com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
     except PermissaoError as exc:
-        print(exc.format_report())
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
     except APIError as exc:
-        print(exc.format_report())
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
 
 
 def consulta_classificacao_nm(chave_nm: str) -> None:
@@ -304,40 +336,46 @@ def consulta_classificacao_nm(chave_nm: str) -> None:
     except NotFoundError:
         print("Classificação ainda não disponível (processamento em andamento).")
     except PermissaoError as exc:
-        print(exc.format_report())
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
     except SINMError as exc:
-        print(f"Erro: {exc}")
+        print(f"Erro: {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 # --------------------------------------------------------------------------
 # Despacho
 # --------------------------------------------------------------------------
 
-if ACAO == "cadastraGleba":
+if ACAO == "autenticacao":
+    autenticacao()
+
+elif ACAO == "listarGlebas":
+    autenticacao()
+    listar_glebas()
+
+elif ACAO == "cadastraGleba":
+    autenticacao()
     cadastra_gleba()
 
 elif ACAO == "cadastraAnaliseSolo":
+    autenticacao()
     cadastra_analise_solo(CHAVE_NM)
 
 elif ACAO == "cadastraSensoriamentoRemoto":
+    autenticacao()
     cadastra_sensoriamento_remoto(CHAVE_NM)
 
 elif ACAO == "consultaClassificacaoNM":
+    autenticacao()
     consulta_classificacao_nm(CHAVE_NM)
 
 else:
     # Fluxo completo
+    autenticacao()
     chave_nm = CHAVE_NM or cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)
         consulta_classificacao_nm(chave_nm)
-
-    print("\n=== Listando glebas cadastradas ===")
-    try:
-        glebas = client.listar_glebas()
-        print(f"Total de glebas: {len(glebas) if isinstance(glebas, list) else '?'}")
-    except PermissaoError as exc:
-        print(exc.format_report())
-    except APIError as exc:
-        print(exc.format_report())
+    listar_glebas()
