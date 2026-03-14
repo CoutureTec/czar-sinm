@@ -47,14 +47,14 @@ SINM_CLIENT_SECRET=seu-client-secret
 Para forçar um ambiente sem editar o arquivo:
 
 ```bash
-SINM_AMBIENTE=prd python example.py --dados dados/processo_001
+SINM_AMBIENTE=prd python exemplo.py --dados dados/processo_001
 ```
 
 ## Estrutura de diretórios
 
 ```
 dados_externos/
-├── example.py
+├── exemplo.py
 ├── .env                              # credenciais (não versionado)
 └── dados/
     └── processo_001/                 # um diretório por processo/talhão
@@ -120,7 +120,7 @@ Cada subdiretório dentro de `dados/` representa um processo independente. Crie 
 ### Fluxo completo
 
 ```bash
-python example.py --dados dados/processo_001
+python exemplo.py --dados dados/processo_001
 ```
 
 Executa as etapas em sequência — autenticação, cadastro de gleba, análise de solo, sensoriamento remoto e consulta da classificação — gravando os resultados em `dados/processo_001/resultado.csv` ao final de cada etapa.
@@ -131,28 +131,28 @@ Use `--acao` para executar apenas uma etapa de cada vez:
 
 ```bash
 # 1. Cadastra a gleba e salva uuid_gleba e chave_nm em resultado.csv
-python example.py --dados dados/processo_001 --acao cadastraGleba
+python exemplo.py --dados dados/processo_001 --acao cadastraGleba
 
 # 2. Cadastra análise de solo (lê chave_nm do resultado.csv automaticamente)
-python example.py --dados dados/processo_001 --acao cadastraAnaliseSolo
+python exemplo.py --dados dados/processo_001 --acao cadastraAnaliseSolo
 
 # 3. Cadastra sensoriamento remoto
-python example.py --dados dados/processo_001 --acao cadastraSensoriamentoRemoto
+python exemplo.py --dados dados/processo_001 --acao cadastraSensoriamentoRemoto
 
 # 4. Consulta a classificação
-python example.py --dados dados/processo_001 --acao consultaClassificacaoNM
+python exemplo.py --dados dados/processo_001 --acao consultaClassificacaoNM
 ```
 
 Nas etapas 2, 3 e 4, a `chave_nm` é lida automaticamente do `resultado.csv` gerado na etapa 1. Também é possível passá-la explicitamente:
 
 ```bash
-python example.py --dados dados/processo_001 --acao cadastraAnaliseSolo --chave_nm MINHA_CHAVE
+python exemplo.py --dados dados/processo_001 --acao cadastraAnaliseSolo --chave_nm MINHA_CHAVE
 ```
 
 Para retomar o fluxo completo a partir de uma chave já existente (pulando o cadastro de gleba):
 
 ```bash
-python example.py --dados dados/processo_001 --chave_nm MINHA_CHAVE
+python exemplo.py --dados dados/processo_001 --chave_nm MINHA_CHAVE
 ```
 
 ## Arquivo de resultado
@@ -177,5 +177,5 @@ O arquivo é mantido entre execuções parciais: cada ação atualiza apenas os 
 3. Execute o script apontando para o novo diretório:
 
 ```bash
-python example.py --dados dados/processo_002
+python exemplo.py --dados dados/processo_002
 ```

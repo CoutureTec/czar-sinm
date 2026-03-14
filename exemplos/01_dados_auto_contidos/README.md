@@ -50,7 +50,7 @@ SINM_CLIENT_SECRET=seu-client-secret
 Para forçar um ambiente específico sem editar o arquivo, passe a variável diretamente:
 
 ```bash
-SINM_AMBIENTE=prd python example.py
+SINM_AMBIENTE=prd python exemplo.py
 ```
 
 ## Como executar
@@ -58,7 +58,7 @@ SINM_AMBIENTE=prd python example.py
 ### Fluxo completo (recomendado para um primeiro teste)
 
 ```bash
-python example.py
+python exemplo.py
 ```
 
 Executa as seguintes etapas em sequência:
@@ -78,22 +78,22 @@ Use `--acao` para executar apenas uma etapa de cada vez:
 
 ```bash
 # Cadastra somente a gleba e imprime a chaveClassificacaoNM
-python example.py --acao cadastraGleba
+python exemplo.py --acao cadastraGleba
 
 # Cadastra análise de solo para uma chave já existente
-python example.py --acao cadastraAnaliseSolo --chave_nm MINHA_CHAVE
+python exemplo.py --acao cadastraAnaliseSolo --chave_nm MINHA_CHAVE
 
 # Cadastra sensoriamento remoto para uma chave já existente
-python example.py --acao cadastraSensoriamentoRemoto --chave_nm MINHA_CHAVE
+python exemplo.py --acao cadastraSensoriamentoRemoto --chave_nm MINHA_CHAVE
 
 # Consulta o resultado da classificação
-python example.py --acao consultaClassificacaoNM --chave_nm MINHA_CHAVE
+python exemplo.py --acao consultaClassificacaoNM --chave_nm MINHA_CHAVE
 ```
 
 Também é possível rodar o fluxo completo a partir de uma chave já existente — o cadastro de gleba é pulado:
 
 ```bash
-python example.py --chave_nm MINHA_CHAVE
+python exemplo.py --chave_nm MINHA_CHAVE
 ```
 
 ## O que está codificado no exemplo
@@ -109,7 +109,7 @@ python example.py --chave_nm MINHA_CHAVE
 | `AnaliseSolo` | 3 amostras com granulometria, macronutrientes e pH |
 | `SensoriamentoRemoto` | 8 índices NDVI/NDTI + interpretações de cobertura, cultura e manejo |
 
-Para adaptar ao seu caso de uso, edite as funções `_dado_gleba()`, `_analise_solo()` e `_sensoriamento_remoto()` diretamente no `example.py`.
+Para adaptar ao seu caso de uso, edite as funções `_dado_gleba()`, `_analise_solo()` e `_sensoriamento_remoto()` diretamente no `exemplo.py`.
 
 ## Saída esperada
 

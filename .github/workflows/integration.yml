@@ -58,14 +58,14 @@ jobs:
       # ------------------------------------------------------------------
       - name: "1 · Autenticação"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py --acao autenticacao
+        run: python exemplo.py --acao autenticacao
 
       # ------------------------------------------------------------------
       # Passo 2 — Listagem de talhões
       # ------------------------------------------------------------------
       - name: "2 · Listar talhões"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py --acao listarGlebas
+        run: python exemplo.py --acao listarGlebas
 
       # ------------------------------------------------------------------
       # Passo 3 — Cadastro de talhão/gleba → captura chave_nm
@@ -74,7 +74,7 @@ jobs:
         id: cadastra_gleba
         working-directory: exemplos/dados_auto_contidos
         run: |
-          OUTPUT=$(python example.py --acao cadastraGleba)
+          OUTPUT=$(python exemplo.py --acao cadastraGleba)
           echo "$OUTPUT"
           CHAVE_NM=$(echo "$OUTPUT" | grep "^CHAVE_NM=" | cut -d= -f2)
           echo "chave_nm=$CHAVE_NM" >> $GITHUB_OUTPUT
@@ -84,21 +84,21 @@ jobs:
       # ------------------------------------------------------------------
       - name: "4 · Cadastrar análise de solo"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py --acao cadastraAnaliseSolo --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+        run: python exemplo.py --acao cadastraAnaliseSolo --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       # ------------------------------------------------------------------
       # Passo 5 — Sensoriamento remoto
       # ------------------------------------------------------------------
       - name: "5 · Cadastrar sensoriamento remoto"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py --acao cadastraSensoriamentoRemoto --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+        run: python exemplo.py --acao cadastraSensoriamentoRemoto --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       # ------------------------------------------------------------------
       # Passo 6 — Consulta da classificação
       # ------------------------------------------------------------------
       - name: "6 · Consultar classificação NM"
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py --acao consultaClassificacaoNM --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
+        run: python exemplo.py --acao consultaClassificacaoNM --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       - name: Limpar .env
         if: always()

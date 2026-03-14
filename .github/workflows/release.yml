@@ -78,11 +78,11 @@ jobs:
 
       - name: Exemplo dados_auto_contidos — fluxo completo
         working-directory: exemplos/dados_auto_contidos
-        run: python example.py
+        run: python exemplo.py
 
       - name: Exemplo dados_externos — fluxo completo
         working-directory: exemplos/dados_externos
-        run: python example.py --dados dados/processo_001
+        run: python exemplo.py --dados dados/processo_001
 
       - name: Limpar arquivos .env
         if: always()
