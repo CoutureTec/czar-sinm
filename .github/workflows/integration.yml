@@ -45,7 +45,7 @@ jobs:
 
       - name: Criar .env
         run: |
-          cat > exemplos/dados_auto_contidos/.env <<ENVEOF
+          cat > exemplos/01_dados_auto_contidos/.env <<ENVEOF
           SINM_AMBIENTE=hml
           SINM_USERNAME=${{ secrets.SINM_USERNAME }}
           SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
@@ -57,14 +57,14 @@ jobs:
       # Passo 1 — Autenticação
       # ------------------------------------------------------------------
       - name: "1 · Autenticação"
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: python exemplo.py --acao autenticacao
 
       # ------------------------------------------------------------------
       # Passo 2 — Listagem de talhões
       # ------------------------------------------------------------------
       - name: "2 · Listar talhões"
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: python exemplo.py --acao listarGlebas
 
       # ------------------------------------------------------------------
@@ -72,7 +72,7 @@ jobs:
       # ------------------------------------------------------------------
       - name: "3 · Cadastrar talhão/gleba"
         id: cadastra_gleba
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: |
           OUTPUT=$(python exemplo.py --acao cadastraGleba)
           echo "$OUTPUT"
@@ -83,23 +83,23 @@ jobs:
       # Passo 4 — Análise de solo
       # ------------------------------------------------------------------
       - name: "4 · Cadastrar análise de solo"
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: python exemplo.py --acao cadastraAnaliseSolo --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       # ------------------------------------------------------------------
       # Passo 5 — Sensoriamento remoto
       # ------------------------------------------------------------------
       - name: "5 · Cadastrar sensoriamento remoto"
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: python exemplo.py --acao cadastraSensoriamentoRemoto --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       # ------------------------------------------------------------------
       # Passo 6 — Consulta da classificação
       # ------------------------------------------------------------------
       - name: "6 · Consultar classificação NM"
-        working-directory: exemplos/dados_auto_contidos
+        working-directory: exemplos/01_dados_auto_contidos
         run: python exemplo.py --acao consultaClassificacaoNM --chave_nm ${{ steps.cadastra_gleba.outputs.chave_nm }}
 
       - name: Limpar .env
         if: always()
-        run: rm -f exemplos/dados_auto_contidos/.env
+        run: rm -f exemplos/01_dados_auto_contidos/.env
