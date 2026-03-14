@@ -8,6 +8,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   # ------------------------------------------------------------------
@@ -68,7 +69,7 @@ jobs:
 
       - name: Criar .env para dados_externos
         run: |
-          cat > exemplos/dados_externos/.env <<EOF
+          cat > exemplos/02_dados_externos/.env <<EOF
           SINM_AMBIENTE=hml
           SINM_USERNAME=${{ secrets.SINM_USERNAME }}
           SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
@@ -78,17 +79,23 @@ jobs:
 
       - name: Exemplo dados_auto_contidos — fluxo completo
         working-directory: exemplos/01_dados_auto_contidos
-        run: python exemplo.py
+        run: |
+          OUTPUT=$(python exemplo.py --acao cadastraGleba)
+          echo "$OUTPUT"
+          CHAVE_NM=$(echo "$OUTPUT" | grep "^CHAVE_NM=" | cut -d= -f2)
+          python exemplo.py --acao cadastraAnaliseSolo --chave_nm "$CHAVE_NM"
+          python exemplo.py --acao cadastraSensoriamentoRemoto --chave_nm "$CHAVE_NM"
+          python exemplo.py --acao consultaClassificacaoNM --chave_nm "$CHAVE_NM"
 
       - name: Exemplo dados_externos — fluxo completo
-        working-directory: exemplos/dados_externos
+        working-directory: exemplos/02_dados_externos
         run: python exemplo.py --dados dados/processo_001
 
       - name: Limpar arquivos .env
         if: always()
         run: |
           rm -f exemplos/01_dados_auto_contidos/.env
-          rm -f exemplos/dados_externos/.env
+          rm -f exemplos/02_dados_externos/.env
 
   # ------------------------------------------------------------------
   # 3. Cria a release — só executa se os dois jobs anteriores passarem
