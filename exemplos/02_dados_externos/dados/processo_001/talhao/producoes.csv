@@ -1,0 +1,5 @@
+codigo_cultura,ilp,data_plantio,data_colheita,data_previsao_plantio,data_previsao_colheita
+001,false,2022-10-01,2023-01-10,,
+018,false,2023-02-21,2023-08-01,,
+001,false,2024-10-01,2025-01-10,,
+001,,,,2026-10-01,2027-01-10
