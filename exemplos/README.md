@@ -1,6 +1,6 @@
 # Exemplos
 
-Aqui há exemplos de códigos python que usam a lib cliente.
+Aqui há exemplos de códigos python que usam a lib cliente. 
 
 ## [dados_auto_contidos](dados_auto_contidos/)
 
