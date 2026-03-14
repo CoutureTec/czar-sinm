@@ -27,10 +27,16 @@ Há exemplos de uso com dados embutidos no código e com dados em arquivos CSV.
 
 ## Instalação
 
-**Via GitHub com tag (recomendado):**
+**Via PyPI (recomendado):**
 
 ```bash
-pip install git+https://github.com/CoutureTec/czar-sinm.git@v1.0.0
+pip install czar-sinm
+```
+
+**Via GitHub com tag:**
+
+```bash
+pip install git+https://github.com/CoutureTec/czar-sinm.git@v0.1.0
 ```
 
 
