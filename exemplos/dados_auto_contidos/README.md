@@ -5,12 +5,12 @@ Este exemplo demonstra o uso completo da biblioteca `czarnm` sem nenhuma depend�
 ## Pré-requisitos
 
 - Python 3.8+
-- Credenciais de acesso ao ZARC-NM (usuário, senha, client ID e client secret)
+- Credenciais de acesso ao SiNM (usuário, senha, client ID e client secret)
 
 Instale a biblioteca e as dependências do exemplo:
 
 ```bash
-pip install git+https://github.com/CoutureTec/czar-nm.git
+pip install git+https://github.com/CoutureTec/czar-sinm.git
 pip install python-dotenv
 ```
 
@@ -34,15 +34,15 @@ Edite o `.env`:
 
 ```ini
 # Ambiente: hml | prd
-ZARCNM_AMBIENTE=hml
+SINM_AMBIENTE=hml
 
 # Credenciais do usuário
-ZARCNM_USERNAME=seu.usuario@embrapa.br
-ZARCNM_PASSWORD=sua_senha
+SINM_USERNAME=seu.usuario@embrapa.br
+SINM_PASSWORD=sua_senha
 
-# Credenciais do client Keycloak (fornecidas pela equipe ZARC-NM)
-ZARCNM_CLIENT_ID=seu-client-id
-ZARCNM_CLIENT_SECRET=seu-client-secret
+# Credenciais do client Keycloak (fornecidas pela equipe SiNM)
+SINM_CLIENT_ID=seu-client-id
+SINM_CLIENT_SECRET=seu-client-secret
 ```
 
 > **Atenção:** nunca versione o `.env`. Ele está listado no `.gitignore`.
@@ -50,7 +50,7 @@ ZARCNM_CLIENT_SECRET=seu-client-secret
 Para forçar um ambiente específico sem editar o arquivo, passe a variável diretamente:
 
 ```bash
-ZARCNM_AMBIENTE=prd python example.py
+SINM_AMBIENTE=prd python example.py
 ```
 
 ## Como executar

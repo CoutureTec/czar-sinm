@@ -1,5 +1,5 @@
 """
-ZarcNMClient — cliente HTTP para a API ZARC Nível de Manejo.
+SINMClient — cliente HTTP para a API SiNM (Sistema de Informações de Níveis de Manejo).
 
 Fluxo principal:
   1. Autenticar (Keycloak) → token JWT
@@ -45,15 +45,15 @@ def _roles_para_endpoint(path: str) -> list:
     return []
 
 
-class ZarcNMClient:
+class SINMClient:
     """
-    Cliente para a API ZARC Nível de Manejo (ZARC-NM).
+    Cliente para a API SiNM (Sistema de Informações de Níveis de Manejo) (SiNM).
 
     Exemplo de uso::
 
-        from czarnm import ZarcNMClient
+        from czarnm import SINMClient
 
-        client = ZarcNMClient(
+        client = SINMClient(
             username="meu.usuario@embrapa.br",
             password="minha_senha",
             client_id="meu-client-id",
@@ -86,13 +86,13 @@ class ZarcNMClient:
         Parameters
         ----------
         username:
-            Login do usuário no Keycloak/ZARC-NM.
+            Login do usuário no Keycloak/SiNM.
         password:
             Senha do usuário.
         client_id:
-            Client ID fornecido pela equipe ZARC-NM.
+            Client ID fornecido pela equipe SiNM.
         client_secret:
-            Client secret fornecido pela equipe ZARC-NM.
+            Client secret fornecido pela equipe SiNM.
         ambiente:
             'hml' ou 'prd'. Define realm e URL base automaticamente.
         base_url:

@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from czarnm import (
-    ZarcNMClient,
+    SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
     AnaliseSolo, Amostra,
@@ -29,7 +29,7 @@ from czarnm import (
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
     DadosInput,
 )
-from czarnm.exceptions import ZarcNMError, NotFoundError, APIError, PermissaoError
+from czarnm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
     "cadastraGleba",
@@ -42,7 +42,7 @@ ACOES = (
 # Argumentos de linha de comando
 # --------------------------------------------------------------------------
 parser = argparse.ArgumentParser(
-    description="Exemplo de integração com a API ZARC-NM.",
+    description="Exemplo de integração com a API SINM.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
 )
 parser.add_argument(
@@ -84,16 +84,16 @@ logging.basicConfig(
 # --------------------------------------------------------------------------
 # Credenciais (.env)
 # --------------------------------------------------------------------------
-USUARIO       = os.environ["ZARCNM_USERNAME"]
-SENHA         = os.environ["ZARCNM_PASSWORD"]
-CLIENT_ID     = os.environ["ZARCNM_CLIENT_ID"]
-CLIENT_SECRET = os.environ["ZARCNM_CLIENT_SECRET"]
-AMBIENTE      = os.getenv("ZARCNM_AMBIENTE", "hml")
+USUARIO       = os.environ["SINM_USERNAME"]
+SENHA         = os.environ["SINM_PASSWORD"]
+CLIENT_ID     = os.environ["SINM_CLIENT_ID"]
+CLIENT_SECRET = os.environ["SINM_CLIENT_SECRET"]
+AMBIENTE      = os.getenv("SINM_AMBIENTE", "hml")
 
 # --------------------------------------------------------------------------
 # Client
 # --------------------------------------------------------------------------
-client = ZarcNMClient(
+client = SINMClient(
     username=USUARIO,
     password=SENHA,
     client_id=CLIENT_ID,
@@ -305,7 +305,7 @@ def consulta_classificacao_nm(chave_nm: str) -> None:
         print("Classificação ainda não disponível (processamento em andamento).")
     except PermissaoError as exc:
         print(exc.format_report())
-    except ZarcNMError as exc:
+    except SINMError as exc:
         print(f"Erro: {exc}")
 
 

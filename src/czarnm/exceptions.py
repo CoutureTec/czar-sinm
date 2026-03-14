@@ -1,19 +1,19 @@
-"""Exceções customizadas do cliente ZARC-NM."""
+"""Exceções customizadas do cliente SiNM."""
 
 from __future__ import annotations
 from typing import Optional
 
 
-class ZarcNMError(Exception):
-    """Classe base para erros do cliente ZARC-NM."""
+class SINMError(Exception):
+    """Classe base para erros do cliente SiNM."""
 
 
-class AuthenticationError(ZarcNMError):
+class AuthenticationError(SINMError):
     """Erro de autenticação no Keycloak."""
 
 
-class APIError(ZarcNMError):
-    """Erro retornado pela API ZARC-NM."""
+class APIError(SINMError):
+    """Erro retornado pela API SiNM."""
 
     def __init__(self, status_code: int, message: str, body: Optional[dict] = None):
         self.status_code = status_code
@@ -32,7 +32,7 @@ class APIError(ZarcNMError):
             return f"{left}{'═' * (W - 2)}{right}"
 
         lines.append(f"╔{'═' * (W - 2)}╗")
-        lines.append(row("ERRO NA API ZARC-NM"))
+        lines.append(row("ERRO NA API SiNM"))
         lines.append(divider())
         lines.append(row(f"Status   : {self.status_code}"))
 
@@ -106,7 +106,7 @@ class PermissaoError(APIError):
 
         lines = [
             f"╔{'═' * (W - 2)}╗",
-            row("ACESSO NEGADO — ZARC-NM (HTTP 403)"),
+            row("ACESSO NEGADO — SiNM (HTTP 403)"),
             divider(),
         ]
 
@@ -137,11 +137,11 @@ class PermissaoError(APIError):
 
             if faltam:
                 lines.append(divider())
-                lines.append(row("Solicite à equipe ZARC-NM um dos roles acima"))
+                lines.append(row("Solicite à equipe SiNM um dos roles acima"))
                 lines.append(row("marcados com ✗ para seu usuário no Keycloak."))
         else:
             lines.append(row("Roles necessários não identificados."))
-            lines.append(row("Verifique as permissões com a equipe ZARC-NM."))
+            lines.append(row("Verifique as permissões com a equipe SiNM."))
 
         lines.append(f"╚{'═' * (W - 2)}╝")
         return "\n".join(lines)

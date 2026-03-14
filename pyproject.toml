@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "czarnm"
 version = "0.1.0"
-description = "Cliente Python para a API ZARC Nível de Manejo (ZARC-NM / Embrapa)"
+description = "Cliente Python para a API SINM Nível de Manejo (SINM / Embrapa)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 authors = [
     {name = "CoutureTec", email = "contato@couturetec.com.br"},
 ]
-keywords = ["zarc", "zarcnm", "embrapa", "agro", "nível de manejo", "api", "client"]
+keywords = ["zarc", "zarcnm", "sinm", "embrapa", "agro", "nível de manejo", "api", "client"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -40,10 +40,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/CoutureTec/czar-nm"
-Repository = "https://github.com/CoutureTec/czar-nm"
-Issues = "https://github.com/CoutureTec/czar-nm/issues"
-Changelog = "https://github.com/CoutureTec/czar-nm/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/CoutureTec/czar-sinm"
+Repository = "https://github.com/CoutureTec/czar-sinm"
+Issues = "https://github.com/CoutureTec/czar-sinm/issues"
+Changelog = "https://github.com/CoutureTec/czar-sinm/blob/main/CHANGELOG.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

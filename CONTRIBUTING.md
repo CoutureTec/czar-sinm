@@ -14,7 +14,7 @@ Abra uma issue no GitHub descrevendo:
 ## Configurando o ambiente de desenvolvimento
 
 ```bash
-git clone https://github.com/CoutureTec/czar-nm.git czar-client
+git clone https://github.com/CoutureTec/czar-sinm.git czar-client
 cd czar-client
 pip install -e ".[dev]"
 ```
@@ -42,7 +42,7 @@ pytest
 
 ```
 src/czarnm/
-├── client.py       # ZarcNMClient — métodos públicos da API
+├── client.py       # SINMClient — métodos públicos da API
 ├── auth.py         # Autenticação Keycloak com cache de token
 ├── models.py       # Dataclasses dos payloads
 └── exceptions.py   # Hierarquia de erros

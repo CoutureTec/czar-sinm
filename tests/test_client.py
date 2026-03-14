@@ -1,9 +1,9 @@
-"""Testes unitários do ZarcNMClient com HTTP mockado via `responses`."""
+"""Testes unitários do SINMClient com HTTP mockado via `responses`."""
 
 import pytest
 import responses as rsps_lib
 
-from czarnm import ZarcNMClient
+from czarnm import SINMClient
 from czarnm.client import API_URLS, _roles_para_endpoint
 from czarnm.exceptions import APIError, NotFoundError, PermissaoError, ValidationError
 
@@ -46,21 +46,21 @@ class TestInit:
     def test_base_url_prd(self, fake_token):
         from unittest.mock import MagicMock
         from czarnm.auth import KeycloakAuth
-        c = ZarcNMClient(
+        c = SINMClient(
             username="u", password="p", client_id="c", client_secret="s",
             ambiente="prd",
         )
         assert c._base_url == API_URLS["prd"]
 
     def test_base_url_customizada(self):
-        c = ZarcNMClient(
+        c = SINMClient(
             username="u", password="p", client_id="c", client_secret="s",
             base_url="http://api.local",
         )
         assert c._base_url == "http://api.local"
 
     def test_base_url_strip_trailing_slash(self):
-        c = ZarcNMClient(
+        c = SINMClient(
             username="u", password="p", client_id="c", client_secret="s",
             base_url="http://api.local/",
         )

@@ -1,17 +1,17 @@
-# czarnm — Cliente ZARC Nível de Manejo
+# czarnm — Cliente da API do SiNM
 
-[![CI](https://github.com/CoutureTec/czar-nm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-nm/actions/workflows/ci.yml)
+[![CI](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml)
 
-Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola de Risco Climático — Nível de Manejo).
+Biblioteca Python para integração com a **SiNM** (Sistema de Informações de Níveis de Manejo).
 
-Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema ZarcNM.
+Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema SiNM.
 
 Há exemplos de uso com fonte de dados interna e arquivos. → [Veja os exemplos de uso](exemplos/README.md)
 
 
-# Motivação de usar uma biblioteca pública 
+# Motivação de manter uma biblioteca pública 
 
-Integrar com o ZARC-NM envolve **autenticação OAuth2** com renovação automática de token, serialização de **payloads complexos**, tratamento diferenciado de erros por tipo (validação, permissão, recurso não encontrado) e um **fluxo de múltiplas etapas** com dependências entre si. Implementar tudo isso do zero em cada projeto **consome dias de desenvolvimento** e gera código duplicado, frágil e difícil de manter.
+Integrar com o SiNM envolve **autenticação OAuth2** com renovação automática de token, serialização de **payloads complexos**, tratamento diferenciado de erros por tipo (validação, permissão, recurso não encontrado) e um **fluxo de múltiplas etapas** com dependências entre si. Implementar tudo isso do zero em cada projeto **consome dias de desenvolvimento** e gera código duplicado, frágil e difícil de manter.
 
 O `czarnm` encapsula toda essa complexidade em uma interface de alto nível: **com poucas linhas de código** seu time já está enviando glebas, análises de solo e sensoriamentos, sem precisar conhecer os detalhes do protocolo Keycloak nem a estrutura interna da API.
 
@@ -29,7 +29,7 @@ Há exemplos de uso com dados embutidos no código e com dados em arquivos CSV.
 **Via GitHub com tag (recomendado):**
 
 ```bash
-pip install git+https://github.com/CoutureTec/czar-nm.git@v1.0.0
+pip install git+https://github.com/CoutureTec/czar-sinm.git@v1.0.0
 ```
 
 
@@ -37,18 +37,18 @@ pip install git+https://github.com/CoutureTec/czar-nm.git@v1.0.0
 
 ```
 src/czarnm/
-├── client.py       # ZarcNMClient — métodos principais + diagnóstico de 403
+├── client.py       # SINMClient — métodos principais + diagnóstico de 403
 ├── auth.py         # Autenticação Keycloak com cache e renovação de token
 ├── models.py       # Dataclasses para os payloads da API
-└── exceptions.py   # ZarcNMError, ValidationError, NotFoundError, PermissaoError, ...
+└── exceptions.py   # SINMError, ValidationError, NotFoundError, PermissaoError, ...
 ```
 
 ## Referência rápida da API
 
 ```python
-from czarnm import ZarcNMClient
+from czarnm import SINMClient
 
-client = ZarcNMClient(
+client = SINMClient(
     username="...", password="...",
     client_id="...", client_secret="...",
     ambiente="hml",
@@ -82,7 +82,7 @@ client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 
 ## Tratamento de erros
 
-Os erros retornados pelas chamadas à api são logados de forma a tornar mais claro o possível a sua causa, baseado na documentação da API do Zarcnm.
+Os erros retornados pelas chamadas à api são logados de forma a tornar mais claro o possível a sua causa, baseado na documentação da API do SiNM.
 
 ```python
 from czarnm.exceptions import (
@@ -117,7 +117,7 @@ except APIError as e:
 
 ```
 ╔════════════════════════════════════════════════════════════╗
-║  ACESSO NEGADO — ZARC-NM (HTTP 403)                        ║
+║  ACESSO NEGADO — SiNM (HTTP 403)                           ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Endpoint : /api/v1/analises-solo/MINHA_CHAVE              ║
 ╠════════════════════════════════════════════════════════════╣
@@ -129,7 +129,7 @@ except APIError as e:
 ║    ✗ BETA_USER                                             ║
 ║    ✗ OPERADOR_ANALISE_SOLO                                 ║
 ╠════════════════════════════════════════════════════════════╣
-║  Solicite à equipe ZARC-NM um dos roles acima              ║
+║  Solicite à equipe SiNM um dos roles acima                 ║
 ║  marcados com ✗ para seu usuário no Keycloak.              ║
 ╚════════════════════════════════════════════════════════════╝
 ```
@@ -138,7 +138,7 @@ except APIError as e:
 
 ```
 ╔════════════════════════════════════════════════════════════╗
-║  ERRO NA API ZARC-NM                                       ║
+║  ERRO NA API SiNM                                          ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Status   : 422                                            ║
 ║  Título   : Erro de validação                              ║

@@ -6,10 +6,10 @@ name: Testes de Integração
 # para branches do próprio repositório. PRs de forks serão ignorados.
 #
 # Segredos necessários (Settings → Secrets and variables → Actions):
-#   ZARCNM_USERNAME
-#   ZARCNM_PASSWORD
-#   ZARCNM_CLIENT_ID
-#   ZARCNM_CLIENT_SECRET
+#   SINM_USERNAME
+#   SINM_PASSWORD
+#   SINM_CLIENT_ID
+#   SINM_CLIENT_SECRET
 
 on:
   pull_request:
@@ -27,10 +27,10 @@ jobs:
 
       - name: Verificar se secrets estão disponíveis
         env:
-          SECRET: ${{ secrets.ZARCNM_USERNAME }}
+          SECRET: ${{ secrets.SINM_USERNAME }}
         run: |
           if [ -z "$SECRET" ]; then
-            echo "::error::Secrets não configurados. Configure ZARCNM_USERNAME, ZARCNM_PASSWORD, ZARCNM_CLIENT_ID e ZARCNM_CLIENT_SECRET em Settings → Secrets and variables → Actions."
+            echo "::error::Secrets não configurados. Configure SINM_USERNAME, SINM_PASSWORD, SINM_CLIENT_ID e SINM_CLIENT_SECRET em Settings → Secrets and variables → Actions."
             exit 1
           fi
 
@@ -45,21 +45,21 @@ jobs:
       - name: Criar .env para dados_auto_contidos
         run: |
           cat > exemplos/dados_auto_contidos/.env <<EOF
-          ZARCNM_AMBIENTE=hml
-          ZARCNM_USERNAME=${{ secrets.ZARCNM_USERNAME }}
-          ZARCNM_PASSWORD=${{ secrets.ZARCNM_PASSWORD }}
-          ZARCNM_CLIENT_ID=${{ secrets.ZARCNM_CLIENT_ID }}
-          ZARCNM_CLIENT_SECRET=${{ secrets.ZARCNM_CLIENT_SECRET }}
+          SINM_AMBIENTE=hml
+          SINM_USERNAME=${{ secrets.SINM_USERNAME }}
+          SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
+          SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
+          SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
           EOF
 
       - name: Criar .env para dados_externos
         run: |
           cat > exemplos/dados_externos/.env <<EOF
-          ZARCNM_AMBIENTE=hml
-          ZARCNM_USERNAME=${{ secrets.ZARCNM_USERNAME }}
-          ZARCNM_PASSWORD=${{ secrets.ZARCNM_PASSWORD }}
-          ZARCNM_CLIENT_ID=${{ secrets.ZARCNM_CLIENT_ID }}
-          ZARCNM_CLIENT_SECRET=${{ secrets.ZARCNM_CLIENT_SECRET }}
+          SINM_AMBIENTE=hml
+          SINM_USERNAME=${{ secrets.SINM_USERNAME }}
+          SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
+          SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
+          SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
           EOF
 
       - name: Exemplo dados_auto_contidos — fluxo completo

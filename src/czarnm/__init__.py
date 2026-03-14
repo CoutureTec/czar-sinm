@@ -1,8 +1,8 @@
 """
-czarnm — Cliente ZARC-NM: Cliente Python para a API ZARC Nível de Manejo
+czarnm — Cliente SiNM: Cliente Python para a API SiNM (Sistema de Informações de Níveis de Manejo)
 """
 
-from .client import ZarcNMClient
+from .client import SINMClient
 from .models import (
     Produtor,
     Propriedade,
@@ -24,7 +24,7 @@ from .models import (
     SensoriamentoRemoto,
 )
 from .exceptions import (
-    ZarcNMError,
+    SINMError,
     AuthenticationError,
     APIError,
     NotFoundError,
@@ -33,7 +33,7 @@ from .exceptions import (
 )
 
 __all__ = [
-    "ZarcNMClient",
+    "SINMClient",
     "Produtor",
     "Propriedade",
     "Talhao",
@@ -52,7 +52,7 @@ __all__ = [
     "InterpretacaoCultura",
     "InterpretacaoManejo",
     "SensoriamentoRemoto",
-    "ZarcNMError",
+    "SINMError",
     "AuthenticationError",
     "APIError",
     "NotFoundError",

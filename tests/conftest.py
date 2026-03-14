@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from czarnm import (
-    ZarcNMClient,
+    SINMClient,
     Amostra,
     AnaliseSolo,
     CoberturaSolo,
@@ -45,8 +45,8 @@ def fake_token():
 
 @pytest.fixture
 def client(fake_token):
-    """ZarcNMClient com autenticação mockada (sem chamadas reais ao Keycloak)."""
-    c = ZarcNMClient(
+    """SINMClient com autenticação mockada (sem chamadas reais ao Keycloak)."""
+    c = SINMClient(
         username="usuario@test.br",
         password="senha",
         client_id="client-id",

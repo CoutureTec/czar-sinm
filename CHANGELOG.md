@@ -19,7 +19,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [0.1.0] — 2025-04-01
 
 ### Adicionado
-- `ZarcNMClient` com suporte aos ambientes `hml` e `prd`
+- `SINMClient` com suporte aos ambientes `hml` e `prd`
 - Autenticação via Keycloak (OAuth2 Resource Owner Password Credentials) com cache e renovação automática de token
 - `cadastrar_gleba` / `buscar_gleba` / `listar_glebas`
 - `cadastrar_analise_solo` / `buscar_analise_solo` / `listar_analises_solo`
@@ -27,6 +27,6 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - `consultar_classificacao` / `listar_classificacoes`
 - `cadastrar_operacao` (fluxo combinado por UUIDs)
 - Modelos de dados: `DadoGleba`, `AnaliseSolo`, `SensoriamentoRemoto`, `DadosInput` e todos os tipos auxiliares
-- Hierarquia de exceções: `ZarcNMError`, `AuthenticationError`, `APIError`, `ValidationError`, `NotFoundError`, `PermissaoError`
+- Hierarquia de exceções: `SINMError`, `AuthenticationError`, `APIError`, `ValidationError`, `NotFoundError`, `PermissaoError`
 - Diagnóstico automático de HTTP 403 com diff de roles do usuário vs. roles exigidos pelo endpoint
 - Relatórios formatados em `APIError.format_report()` e `PermissaoError.format_report()`

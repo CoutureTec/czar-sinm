@@ -1,5 +1,5 @@
 """
-Modelos de dados para os payloads da API ZARC-NM.
+Modelos de dados para os payloads da API SINM.
 Baseado nos tipos de input do sistema:
   - DadoGlebaInput (produtor, propriedade, talhao, manejos, coberturas, producoes)
   - AnaliseSoloInput (cpfProdutor, cnpj, amostras)

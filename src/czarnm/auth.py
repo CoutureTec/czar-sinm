@@ -50,9 +50,9 @@ class KeycloakAuth:
         password:
             Senha do usuário.
         client_id:
-            Client ID fornecido pela equipe ZARC-NM.
+            Client ID fornecido pela equipe SINM.
         client_secret:
-            Client secret fornecido pela equipe ZARC-NM.
+            Client secret fornecido pela equipe SINM.
         ambiente:
             'hml' ou 'prd'. Define o realm utilizado.
         keycloak_url:

@@ -8,7 +8,7 @@ from czarnm.exceptions import (
     NotFoundError,
     PermissaoError,
     ValidationError,
-    ZarcNMError,
+    SINMError,
 )
 
 
@@ -17,11 +17,11 @@ from czarnm.exceptions import (
 # ---------------------------------------------------------------------------
 
 class TestHierarquia:
-    def test_api_error_e_zarcnm_error(self):
-        assert issubclass(APIError, ZarcNMError)
+    def test_api_error_e_sinm_error(self):
+        assert issubclass(APIError, SINMError)
 
-    def test_authentication_error_e_zarcnm_error(self):
-        assert issubclass(AuthenticationError, ZarcNMError)
+    def test_authentication_error_e_sinm_error(self):
+        assert issubclass(AuthenticationError, SINMError)
 
     def test_not_found_error_e_api_error(self):
         assert issubclass(NotFoundError, APIError)
@@ -52,7 +52,7 @@ class TestAPIError:
         err = APIError(500, "erro interno")
         report = err.format_report()
         assert "500" in report
-        assert "ERRO NA API ZARC-NM" in report
+        assert "ERRO NA API SiNM" in report
 
     def test_format_report_com_title(self):
         err = APIError(422, "inválido", {"title": "Erro de validação"})

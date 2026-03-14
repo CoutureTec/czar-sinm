@@ -42,7 +42,7 @@ jobs:
 
       - name: Verificar se secrets estão disponíveis
         env:
-          SECRET: ${{ secrets.ZARCNM_USERNAME }}
+          SECRET: ${{ secrets.SINM_USERNAME }}
         run: |
           if [ -z "$SECRET" ]; then
             echo "::error::Secrets não configurados. A release não pode ser criada sem validar a integração."
@@ -59,21 +59,21 @@ jobs:
       - name: Criar .env para dados_auto_contidos
         run: |
           cat > exemplos/dados_auto_contidos/.env <<EOF
-          ZARCNM_AMBIENTE=hml
-          ZARCNM_USERNAME=${{ secrets.ZARCNM_USERNAME }}
-          ZARCNM_PASSWORD=${{ secrets.ZARCNM_PASSWORD }}
-          ZARCNM_CLIENT_ID=${{ secrets.ZARCNM_CLIENT_ID }}
-          ZARCNM_CLIENT_SECRET=${{ secrets.ZARCNM_CLIENT_SECRET }}
+          SINM_AMBIENTE=hml
+          SINM_USERNAME=${{ secrets.SINM_USERNAME }}
+          SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
+          SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
+          SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
           EOF
 
       - name: Criar .env para dados_externos
         run: |
           cat > exemplos/dados_externos/.env <<EOF
-          ZARCNM_AMBIENTE=hml
-          ZARCNM_USERNAME=${{ secrets.ZARCNM_USERNAME }}
-          ZARCNM_PASSWORD=${{ secrets.ZARCNM_PASSWORD }}
-          ZARCNM_CLIENT_ID=${{ secrets.ZARCNM_CLIENT_ID }}
-          ZARCNM_CLIENT_SECRET=${{ secrets.ZARCNM_CLIENT_SECRET }}
+          SINM_AMBIENTE=hml
+          SINM_USERNAME=${{ secrets.SINM_USERNAME }}
+          SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
+          SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
+          SINM_CLIENT_SECRET=${{ secrets.SINM_CLIENT_SECRET }}
           EOF
 
       - name: Exemplo dados_auto_contidos — fluxo completo
@@ -115,7 +115,7 @@ jobs:
   # Usa Trusted Publisher (OIDC) — sem API token armazenado como secret.
   # Configuração única no PyPI:
   #   pypi.org → Account → Publishing → Add trusted publisher
-  #   owner: CoutureTec | repo: czar-nm | workflow: release.yml | env: pypi
+  #   owner: CoutureTec | repo: czar-sinm | workflow: release.yml | env: pypi
   # ------------------------------------------------------------------
   pypi:
     name: Publicar no PyPI
