@@ -1,4 +1,6 @@
-# czarnm — Cliente ZARC Nível de Manejo 
+# czarnm — Cliente ZARC Nível de Manejo
+
+[![CI](https://github.com/CoutureTec/czar-nm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-nm/actions/workflows/ci.yml)
 
 Biblioteca Python para integração com a API **ZARC-NM** (Zoneamento Agrícola de Risco Climático — Nível de Manejo).
 
