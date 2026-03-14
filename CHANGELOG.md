@@ -8,7 +8,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Não lançado]
 
 ### Adicionado
-- Exemplos de uso com dados auto-contidos (`exemplos/dados_auto_contidos/`)
+- Exemplos de uso com dados auto-contidos (`exemplos/01_dados_auto_contidos/`)
 - Exemplos de uso com dados em arquivos CSV (`exemplos/dados_externos/`)
 - Suíte de testes unitários (`tests/`)
 - Workflow de CI com GitHub Actions (`.github/workflows/ci.yml`)
