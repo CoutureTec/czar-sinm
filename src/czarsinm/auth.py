@@ -40,6 +40,7 @@ class KeycloakAuth:
         client_secret: str,
         ambiente: str = "hml",
         keycloak_url: Optional[str] = None,
+        keycloak_realm: Optional[str] = None,
         proxies: Optional[dict] = None,
     ):
         """
@@ -54,14 +55,34 @@ class KeycloakAuth:
         client_secret:
             Client secret fornecido pela equipe SINM.
         ambiente:
-            'hml' ou 'prd'. Define o realm utilizado.
+            'hml', 'prd' ou qualquer string para ambiente customizado.
+            Em ambientes customizados, 'keycloak_url' e 'keycloak_realm'
+            tornam-se obrigatórios.
         keycloak_url:
-            URL base do Keycloak. Se None, usa a URL padrão da Embrapa.
+            URL base do Keycloak incluindo o segmento /realms
+            (ex: 'https://meu-keycloak.exemplo.com/realms').
+            Obrigatório para ambientes customizados; se None, usa a URL padrão da Embrapa.
+        keycloak_realm:
+            Nome do realm no Keycloak.
+            Obrigatório para ambientes customizados; se None, usa o mapeamento
+            padrão (hml → zarcnm-h, prd → zarcnm).
         proxies:
             Dicionário de proxies requests (ex: {'https': 'http://proxy:3128'}).
         """
-        realm = REALMS.get(ambiente, ambiente)
-        base = keycloak_url or KEYCLOAK_BASE
+        if ambiente not in REALMS and keycloak_url is None:
+            raise ValueError(
+                f"Ambiente '{ambiente}' não reconhecido. "
+                "Para ambientes customizados, informe 'keycloak_url' "
+                "(ou defina SINM_KEYCLOAK no arquivo .env)."
+            )
+        if ambiente not in REALMS and keycloak_realm is None:
+            raise ValueError(
+                f"Ambiente '{ambiente}' não reconhecido. "
+                "Para ambientes customizados, informe 'keycloak_realm' "
+                "(ou defina SINM_KEYCLOAK_REALM no arquivo .env)."
+            )
+        realm = keycloak_realm or REALMS.get(ambiente, ambiente)
+        base = (keycloak_url or KEYCLOAK_BASE).rstrip("/")
         self._token_url = f"{base}/{realm}/protocol/openid-connect/token"
 
         self._credentials = {
