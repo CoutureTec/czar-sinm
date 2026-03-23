@@ -114,9 +114,14 @@ client = SINMClient(
 )
 
 print("\n=== Autenticação ===")
-roles = client.roles
-print(f"Usuário : {USUARIO}")
-print(f"Roles   : {roles}")
+roles        = client.roles
+client_roles = client.client_roles
+print(f"Usuário     : {USUARIO}")
+print(f"Realm roles : {roles}")
+for _client_id, _cr in client_roles.items():
+    print(f"Papeis de acesso no client {_client_id}:")
+    for _papel in _cr:
+        print(f"  - {_papel}")
 
 # --------------------------------------------------------------------------
 # Helpers de leitura de CSV

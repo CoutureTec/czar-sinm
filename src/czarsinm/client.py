@@ -138,8 +138,16 @@ class SINMClient:
 
     @property
     def roles(self) -> list:
-        """Roles do usuário autenticado extraídos do token JWT."""
+        """Realm roles do usuário autenticado extraídos do token JWT."""
         return self._auth.roles
+
+    @property
+    def client_roles(self) -> dict:
+        """Client roles do usuário autenticado agrupados por client ID.
+
+        Formato: {client_id: [role1, role2, ...]}
+        """
+        return self._auth.client_roles
 
     # ------------------------------------------------------------------
     # Talhão / Gleba
