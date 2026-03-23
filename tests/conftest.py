@@ -31,9 +31,9 @@ from czarsinm.auth import KeycloakAuth
 BASE_URL_HML = "https://www.zarcnm-h.cnptia.embrapa.br/zarcnm"
 
 
-def make_jwt(roles: list) -> str:
-    """Constrói um JWT fake com os roles fornecidos (sem assinatura real)."""
-    payload = {"realm_access": {"roles": roles}}
+def make_jwt(roles: list, client_id: str = "client-id") -> str:
+    """Constrói um JWT fake com os roles como client roles (sem assinatura real)."""
+    payload = {"resource_access": {client_id: {"roles": roles}}}
     b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
     return f"eyJhbGciOiJSUzI1NiJ9.{b64}.assinatura_fake"
 
@@ -56,6 +56,7 @@ def client(fake_token):
     auth_mock = MagicMock(spec=KeycloakAuth)
     auth_mock.auth_header = {"Authorization": f"Bearer {fake_token}"}
     auth_mock.roles = ["OPERADOR_CONTRATOS", "BETA_USER"]
+    auth_mock.client_roles = {"client-id": ["OPERADOR_CONTRATOS", "BETA_USER"]}
     c._auth = auth_mock
     return c
 
