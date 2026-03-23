@@ -297,7 +297,7 @@ def cadastra_gleba() -> str:
         resp = client.cadastrar_gleba(_dado_gleba())
         chave = resp.get("chaveClassificacaoNM")
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {chave}")
         # Linha parsável para captura em CI (ex: GitHub Actions)
         print(f"CHAVE_NM={chave}")
@@ -315,7 +315,7 @@ def cadastra_analise_solo(chave_nm: str) -> None:
     try:
         resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
         print("Análise de solo cadastrada com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidAnaliseSolo')}")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -331,7 +331,7 @@ def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
             _sensoriamento_remoto(), chave_classificacao_nm=chave_nm
         )
         print("Sensoriamento remoto cadastrado com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidSensoriamentoRemoto')}")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)

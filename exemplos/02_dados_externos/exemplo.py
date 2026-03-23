@@ -345,7 +345,7 @@ def cadastra_gleba():
     try:
         resp = client.cadastrar_gleba(ler_dado_gleba(DIRETORIO))
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {resp.get('chaveClassificacaoNM')}")
         resultado = ler_resultado()
         resultado["uuid_gleba"] = resp.get("uuid", "")
