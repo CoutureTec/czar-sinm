@@ -79,6 +79,7 @@ class SINMClient:
         ambiente: str = "hml",
         base_url: Optional[str] = None,
         keycloak_url: Optional[str] = None,
+        keycloak_realm: Optional[str] = None,
         proxies: Optional[dict] = None,
         timeout: int = 60,
     ):
@@ -94,16 +95,32 @@ class SINMClient:
         client_secret:
             Client secret fornecido pela equipe SiNM.
         ambiente:
-            'hml' ou 'prd'. Define realm e URL base automaticamente.
+            'hml', 'prd' ou qualquer string para ambiente customizado.
+            Em ambientes customizados, 'base_url' e 'keycloak_url' tornam-se
+            obrigatórios.
         base_url:
-            URL base da API. Se None, usa o padrão do ambiente selecionado.
+            URL base da API ZarcNM
+            (ex: 'https://meu-zarcnm.exemplo.com').
+            Obrigatório para ambientes customizados; se None, usa o padrão do ambiente.
         keycloak_url:
-            URL base do Keycloak. Se None, usa a URL padrão da Embrapa.
+            URL base do Keycloak incluindo o segmento /realms
+            (ex: 'https://meu-keycloak.exemplo.com/realms').
+            Obrigatório para ambientes customizados; se None, usa a URL padrão da Embrapa.
+        keycloak_realm:
+            Nome do realm no Keycloak.
+            Obrigatório para ambientes customizados; se None, usa o mapeamento
+            padrão (hml → zarcnm-h, prd → zarcnm).
         proxies:
             Proxies para requests. Ex: {'https': 'http://proxy.cnptia.embrapa.br:3128'}
         timeout:
             Timeout em segundos para chamadas à API.
         """
+        if ambiente not in API_URLS and base_url is None:
+            raise ValueError(
+                f"Ambiente '{ambiente}' não reconhecido. "
+                "Para ambientes customizados, informe 'base_url' "
+                "(ou defina SINM_BACKEND_URL no arquivo .env)."
+            )
         self._auth = KeycloakAuth(
             username=username,
             password=password,
@@ -111,6 +128,7 @@ class SINMClient:
             client_secret=client_secret,
             ambiente=ambiente,
             keycloak_url=keycloak_url,
+            keycloak_realm=keycloak_realm,
             proxies=proxies,
         )
         self._base_url = (base_url or API_URLS.get(ambiente, API_URLS["hml"])).rstrip("/")
@@ -120,8 +138,16 @@ class SINMClient:
 
     @property
     def roles(self) -> list:
-        """Roles do usuário autenticado extraídos do token JWT."""
+        """Realm roles do usuário autenticado extraídos do token JWT."""
         return self._auth.roles
+
+    @property
+    def client_roles(self) -> dict:
+        """Client roles do usuário autenticado agrupados por client ID.
+
+        Formato: {client_id: [role1, role2, ...]}
+        """
+        return self._auth.client_roles
 
     # ------------------------------------------------------------------
     # Talhão / Gleba

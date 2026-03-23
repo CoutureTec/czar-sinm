@@ -90,11 +90,14 @@ logging.basicConfig(
 # --------------------------------------------------------------------------
 # Credenciais (.env)
 # --------------------------------------------------------------------------
-USUARIO       = os.environ["SINM_USERNAME"]
-SENHA         = os.environ["SINM_PASSWORD"]
-CLIENT_ID     = os.environ["SINM_CLIENT_ID"]
-CLIENT_SECRET = os.environ["SINM_CLIENT_SECRET"]
-AMBIENTE      = os.getenv("SINM_AMBIENTE", "hml")
+USUARIO        = os.environ["SINM_USERNAME"]
+SENHA          = os.environ["SINM_PASSWORD"]
+CLIENT_ID      = os.environ["SINM_CLIENT_ID"]
+CLIENT_SECRET  = os.environ["SINM_CLIENT_SECRET"]
+AMBIENTE       = os.getenv("SINM_AMBIENTE", "hml")
+BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
+KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
+KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
 
 # --------------------------------------------------------------------------
 # Client
@@ -105,6 +108,9 @@ client = SINMClient(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     ambiente=AMBIENTE,
+    base_url=BACKEND_URL,
+    keycloak_url=KEYCLOAK_URL,
+    keycloak_realm=KEYCLOAK_REALM,
 )
 
 # --------------------------------------------------------------------------
@@ -255,10 +261,15 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
 
 def autenticacao() -> None:
     print("\n=== Autenticação ===")
-    roles = client.roles
-    print(f"Usuário : {USUARIO}")
-    print(f"Roles   : {roles}")
-    if not roles:
+    roles        = client.roles
+    client_roles = client.client_roles
+    print(f"Usuário     : {USUARIO}")
+    print(f"Realm roles : {roles}")
+    for client_id, cr in client_roles.items():
+        print(f"Papeis de acesso no client {client_id}:")
+        for papel in cr:
+            print(f"  - {papel}")
+    if not roles and not client_roles:
         print("ERRO: nenhum role encontrado no token.", file=sys.stderr)
         sys.exit(1)
 
