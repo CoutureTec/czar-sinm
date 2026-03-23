@@ -169,6 +169,7 @@ def ler_talhao(d):
         area=float(row["area"]),
         tipoProdutor=row["tipo_produtor"],
         plantioContorno=int(row["plantio_contorno"]),
+        cnpjOperador=CLIENT_ID,
     )
 
 
@@ -448,8 +449,8 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(chave)
 
 else:
-    # Fluxo completo
-    chave_nm = _chave_nm_efetiva() or cadastra_gleba()
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)

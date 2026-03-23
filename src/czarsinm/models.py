@@ -75,9 +75,11 @@ class Talhao:
     """Tipo de produtor: 'Proprietário' ou 'Arrendatário'."""
     plantioContorno: int
     """Plantio em contorno: 0 (não) ou 1 (sim)."""
+    cnpjOperador: Optional[str] = None
+    """CNPJ da empresa operadora (client ID no Keycloak). Opcional."""
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _remove_none(asdict(self))
 
 
 @dataclass
@@ -119,8 +121,8 @@ class CoberturaSolo:
     """Avaliação de cobertura do solo (palhada)."""
     dataAvaliacao: str
     """Data da avaliação (formato 'YYYY-MM-DD')."""
-    porcentualPalhada: float
-    """Percentual de palhada (0–100)."""
+    porcentualPalhada: int
+    """Percentual de palhada (0–100), valor inteiro."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -326,8 +328,8 @@ class InterpretacaoCoberturaSolo:
     """Interpretação de cobertura do solo via satélite."""
     dataAvaliacao: str
     """Data da avaliação (formato 'YYYY-MM-DD')."""
-    porcentualPalhada: float
-    """Percentual de palhada (0–100)."""
+    porcentualPalhada: int
+    """Percentual de palhada (0–100), valor inteiro."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -370,8 +372,8 @@ class SensoriamentoRemoto:
     """Data inicial do período monitorado (formato 'YYYY-MM-DD')."""
     dataFinal: str
     """Data final do período monitorado (formato 'YYYY-MM-DD')."""
-    declividadeMedia: float
-    """Declividade média do talhão (0–100)."""
+    declividadeMedia: int
+    """Declividade média do talhão (0–100), valor inteiro."""
     plantioContorno: int
     """Plantio em contorno detectado: 0 ou 1."""
     terraceamento: int

@@ -151,6 +151,7 @@ def _dado_gleba() -> DadoGleba:
             area=32.0,
             tipoProdutor="Proprietário",
             plantioContorno=1,
+            cnpjOperador=CLIENT_ID,
         ),
         manejos=[
             Manejo(
