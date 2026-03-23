@@ -246,3 +246,16 @@ class TestHandleResponse:
         rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", body=requests.ConnectionError("timeout"))
         with pytest.raises(APIError, match="conexão"):
             client.listar_glebas()
+
+    @rsps_lib.activate
+    def test_corpo_erro_como_lista_levanta_api_error(self, client):
+        """Corpo de erro em formato de lista (não dict) não deve causar AttributeError."""
+        rsps_lib.add(
+            rsps_lib.GET,
+            f"{BASE}/api/v1/glebas",
+            json=[{"campo": "gleba", "mensagem": "inválido"}],
+            status=400,
+        )
+        with pytest.raises(APIError) as exc_info:
+            client.listar_glebas()
+        assert exc_info.value.status_code == 400

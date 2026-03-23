@@ -82,8 +82,9 @@ if ACAO in ("cadastraAnaliseSolo", "cadastraSensoriamentoRemoto", "consultaClass
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
+_log_level = logging.DEBUG if os.getenv("DEBUG", "").lower() == "true" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
@@ -383,9 +384,9 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(CHAVE_NM)
 
 else:
-    # Fluxo completo
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
     autenticacao()
-    chave_nm = CHAVE_NM or cadastra_gleba()
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)
