@@ -1,7 +1,46 @@
 """Exceções customizadas do cliente SiNM."""
 
 from __future__ import annotations
+import csv
+import os
 from typing import Optional
+
+_ACOES_CSV = os.path.join(os.path.dirname(__file__), "acoes_sugeridas.csv")
+
+
+def _carregar_acoes() -> list:
+    try:
+        with open(_ACOES_CSV, encoding="utf-8", newline="") as f:
+            return list(csv.DictReader(f))
+    except FileNotFoundError:
+        return []
+
+
+_ACOES = _carregar_acoes()
+
+
+def _buscar_acao_sugerida(status_code: int, path: str = "", codigo: str = "") -> str:
+    """Retorna a ação sugerida mais específica para o erro."""
+    melhor: str = ""
+    melhor_especificidade = -1
+    for row in _ACOES:
+        r_status = row.get("status", "").strip()
+        r_path   = row.get("path",   "").strip()
+        r_codigo = row.get("codigo", "").strip()
+        r_acao   = row.get("acao",   "").strip()
+        if not r_acao:
+            continue
+        if r_status and str(status_code) != r_status:
+            continue
+        if r_path and not path.startswith(r_path):
+            continue
+        if r_codigo and codigo != r_codigo:
+            continue
+        especificidade = bool(r_status) + bool(r_path) * 2 + bool(r_codigo) * 4
+        if especificidade > melhor_especificidade:
+            melhor_especificidade = especificidade
+            melhor = r_acao
+    return melhor
 
 
 class SINMError(Exception):
@@ -97,6 +136,15 @@ class APIError(SINMError):
             for chunk in [raw[i:i + W - 6] for i in range(0, len(raw), W - 6)]:
                 lines.append(row(f"  {chunk}"))
 
+        acao = _buscar_acao_sugerida(
+            self.status_code,
+            path=b.get("instance", ""),
+            codigo=b.get("codigoErro", "") or "",
+        )
+        if acao:
+            lines.append(divider())
+            row_kv("Ação sugerida", acao)
+
         lines.append(f"╚{'═' * (W - 2)}╝")
         return "\n".join(lines)
 
@@ -173,6 +221,15 @@ class PermissaoError(APIError):
         else:
             lines.append(row("Roles necessários não identificados."))
             lines.append(row("Verifique as permissões com a equipe SiNM."))
+
+        acao = _buscar_acao_sugerida(
+            self.status_code,
+            path=self.endpoint,
+            codigo=self.body.get("codigoErro", "") or "",
+        )
+        if acao:
+            lines.append(divider())
+            lines.append(row(f"Ação sugerida: {acao}"))
 
         lines.append(f"╚{'═' * (W - 2)}╝")
         return "\n".join(lines)
