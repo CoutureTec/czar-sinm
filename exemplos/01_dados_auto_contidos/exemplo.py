@@ -82,8 +82,9 @@ if ACAO in ("cadastraAnaliseSolo", "cadastraSensoriamentoRemoto", "consultaClass
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
+_log_level = logging.DEBUG if os.getenv("DEBUG", "").lower() == "true" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
@@ -151,6 +152,7 @@ def _dado_gleba() -> DadoGleba:
             area=32.0,
             tipoProdutor="Proprietário",
             plantioContorno=1,
+            cnpjOperador=CLIENT_ID,
         ),
         manejos=[
             Manejo(
@@ -295,7 +297,7 @@ def cadastra_gleba() -> str:
         resp = client.cadastrar_gleba(_dado_gleba())
         chave = resp.get("chaveClassificacaoNM")
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {chave}")
         # Linha parsável para captura em CI (ex: GitHub Actions)
         print(f"CHAVE_NM={chave}")
@@ -313,7 +315,7 @@ def cadastra_analise_solo(chave_nm: str) -> None:
     try:
         resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
         print("Análise de solo cadastrada com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidAnaliseSolo')}")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -329,7 +331,7 @@ def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
             _sensoriamento_remoto(), chave_classificacao_nm=chave_nm
         )
         print("Sensoriamento remoto cadastrado com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidSensoriamentoRemoto')}")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -382,9 +384,9 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(CHAVE_NM)
 
 else:
-    # Fluxo completo
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
     autenticacao()
-    chave_nm = CHAVE_NM or cadastra_gleba()
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)

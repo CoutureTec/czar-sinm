@@ -11,9 +11,9 @@ from czarsinm.auth import KeycloakAuth, KEYCLOAK_BASE, REALMS
 from czarsinm.exceptions import AuthenticationError
 
 
-def _make_token_response(roles=None, expires_in=300, refresh_expires_in=1800):
-    """Constrói uma resposta de token Keycloak fake."""
-    payload = {"realm_access": {"roles": roles or []}, "sub": "user-123"}
+def _make_token_response(roles=None, client_id="client-id", expires_in=300, refresh_expires_in=1800):
+    """Constrói uma resposta de token Keycloak fake com roles como client roles."""
+    payload = {"resource_access": {client_id: {"roles": roles or []}}, "sub": "user-123"}
     b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
     access_token = f"header.{b64}.sig"
     return {
@@ -37,36 +37,48 @@ def _make_auth(**kwargs) -> KeycloakAuth:
 
 
 # ---------------------------------------------------------------------------
-# _decode_token_roles
+# _decode_client_roles
 # ---------------------------------------------------------------------------
 
-class TestDecodeTokenRoles:
+class TestDecodeClientRoles:
     def test_extrai_roles_do_jwt(self):
         roles = ["OPERADOR_CONTRATOS", "BETA_USER"]
-        payload = {"realm_access": {"roles": roles}}
+        payload = {"resource_access": {"client-id": {"roles": roles}}}
         b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
         token = f"header.{b64}.sig"
-        assert KeycloakAuth._decode_token_roles(token) == roles
+        assert KeycloakAuth._decode_client_roles(token) == {"client-id": roles}
 
-    def test_token_invalido_retorna_lista_vazia(self):
-        assert KeycloakAuth._decode_token_roles("nao.e.um.jwt") == []
+    def test_multiplos_clients(self):
+        payload = {
+            "resource_access": {
+                "client-a": {"roles": ["ROLE_A"]},
+                "client-b": {"roles": ["ROLE_B1", "ROLE_B2"]},
+            }
+        }
+        b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+        token = f"header.{b64}.sig"
+        result = KeycloakAuth._decode_client_roles(token)
+        assert result == {"client-a": ["ROLE_A"], "client-b": ["ROLE_B1", "ROLE_B2"]}
 
-    def test_token_vazio_retorna_lista_vazia(self):
-        assert KeycloakAuth._decode_token_roles("") == []
+    def test_token_invalido_retorna_dict_vazio(self):
+        assert KeycloakAuth._decode_client_roles("nao.e.um.jwt") == {}
 
-    def test_sem_realm_access_retorna_lista_vazia(self):
+    def test_token_vazio_retorna_dict_vazio(self):
+        assert KeycloakAuth._decode_client_roles("") == {}
+
+    def test_sem_resource_access_retorna_dict_vazio(self):
         payload = {"sub": "user"}
         b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
         token = f"header.{b64}.sig"
-        assert KeycloakAuth._decode_token_roles(token) == []
+        assert KeycloakAuth._decode_client_roles(token) == {}
 
     def test_padding_jwt_irregular(self):
         """Tokens JWT com payload de tamanho variável precisam de padding extra."""
         roles = ["ADMIN"]
-        payload = {"realm_access": {"roles": roles}, "extra": "x" * 5}
+        payload = {"resource_access": {"my-client": {"roles": roles}}, "extra": "x" * 5}
         b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
         token = f"h.{b64}.s"
-        assert KeycloakAuth._decode_token_roles(token) == roles
+        assert KeycloakAuth._decode_client_roles(token) == {"my-client": roles}
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +207,11 @@ class TestAuthHeaderERoles:
             header = auth.auth_header
         assert header["Authorization"].startswith("Bearer ")
 
-    def test_roles_extraidos_do_token(self):
+    def test_client_roles_extraidos_do_token(self):
         auth = _make_auth()
-        token_data = _make_token_response(roles=["BETA_USER", "OPERADOR_CONTRATOS"])
+        token_data = _make_token_response(roles=["BETA_USER", "OPERADOR_CONTRATOS"], client_id="client-id")
         with patch.object(auth, "_authenticate", side_effect=lambda: auth._parse_token_response(token_data)):
-            roles = auth.roles
-        assert "BETA_USER" in roles
-        assert "OPERADOR_CONTRATOS" in roles
+            client_roles = auth.client_roles
+        assert "client-id" in client_roles
+        assert "BETA_USER" in client_roles["client-id"]
+        assert "OPERADOR_CONTRATOS" in client_roles["client-id"]

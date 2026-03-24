@@ -355,13 +355,16 @@ class SINMClient:
         return self._handle_response(resp, path)
 
     def _handle_response(self, resp: requests.Response, path: str = ""):
+        logger.debug("Response [%s] %s: %s", resp.status_code, path, resp.text)
+
         if resp.status_code in (200, 201, 204):
             if not resp.content:
                 return {}
             return resp.json()
 
         try:
-            body = resp.json()
+            parsed = resp.json()
+            body = parsed if isinstance(parsed, dict) else {}
         except Exception:
             body = {}
 

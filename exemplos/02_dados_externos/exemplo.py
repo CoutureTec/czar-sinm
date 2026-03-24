@@ -82,8 +82,9 @@ if not DIRETORIO.is_dir():
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
+_log_level = logging.DEBUG if os.getenv("DEBUG", "").lower() == "true" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
@@ -169,6 +170,7 @@ def ler_talhao(d):
         area=float(row["area"]),
         tipoProdutor=row["tipo_produtor"],
         plantioContorno=int(row["plantio_contorno"]),
+        cnpjOperador=CLIENT_ID,
     )
 
 
@@ -343,7 +345,7 @@ def cadastra_gleba():
     try:
         resp = client.cadastrar_gleba(ler_dado_gleba(DIRETORIO))
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {resp.get('chaveClassificacaoNM')}")
         resultado = ler_resultado()
         resultado["uuid_gleba"] = resp.get("uuid", "")
@@ -448,8 +450,8 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(chave)
 
 else:
-    # Fluxo completo
-    chave_nm = _chave_nm_efetiva() or cadastra_gleba()
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)
