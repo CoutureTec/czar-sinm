@@ -5,20 +5,48 @@ Autentica o usuário no Keycloak e imprime um relatório completo das
 autorizações presentes no token JWT: realm roles e client roles por empresa
 (CNPJ / client ID), com a descrição de cada capacidade habilitada.
 
+Opcionalmente, aceita um endpoint (URL completa ou path) e executa um GET
+autenticado, exibindo o status HTTP e o corpo da resposta.
+
 Uso:
     python exemplo.py
+    python exemplo.py --endpoint /api/v1/glebas
+    python exemplo.py --endpoint https://www.zarcnm-h.cnptia.embrapa.br/api/v1/glebas
 
 Credenciais via arquivo .env (cp ../env.example .env).
 """
 
+import argparse
+import json
 import logging
 import os
 
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from czarsinm import SINMClient
+
+# --------------------------------------------------------------------------
+# Argumentos de linha de comando
+# --------------------------------------------------------------------------
+parser = argparse.ArgumentParser(
+    description="Autentica e exibe relatório de autorizações do usuário.",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
+parser.add_argument(
+    "--endpoint",
+    default=None,
+    metavar="URL_OU_PATH",
+    help=(
+        "Endpoint para teste de acesso (GET autenticado).\n"
+        "Aceita URL completa ou path relativo ao backend (ex: /api/v1/glebas)."
+    ),
+)
+args = parser.parse_args()
+
+ENDPOINT = args.endpoint
 
 # --------------------------------------------------------------------------
 # Logging
@@ -183,4 +211,50 @@ def relatorio_acessos() -> None:
     print()
 
 
+def testar_endpoint(url_ou_path: str) -> None:
+    """Faz um GET autenticado no endpoint informado e exibe o resultado."""
+    if url_ou_path.startswith("http://") or url_ou_path.startswith("https://"):
+        url = url_ou_path
+    else:
+        from czarsinm.client import API_URLS
+        base = (BACKEND_URL or API_URLS.get(AMBIENTE, API_URLS["hml"])).rstrip("/")
+        url = base + ("" if url_ou_path.startswith("/") else "/") + url_ou_path
+
+    print()
+    print(_separador("="))
+    print("  TESTE DE ACESSO — GET AUTENTICADO")
+    print(_separador("="))
+    print(f"  URL: {url}")
+    print()
+
+    try:
+        resp = requests.get(
+            url,
+            headers={**client._auth.auth_header, "Accept": "application/json"},
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        print(f"  ERRO de conexao: {exc}")
+        print(_separador("="))
+        return
+
+    print(f"  Status HTTP: {resp.status_code}")
+    print()
+
+    try:
+        body = resp.json()
+        print("  Resposta (JSON):")
+        print(json.dumps(body, ensure_ascii=False, indent=4))
+    except ValueError:
+        print("  Resposta (texto):")
+        print(resp.text or "(sem corpo)")
+
+    print()
+    print(_separador("="))
+    print()
+
+
 relatorio_acessos()
+
+if ENDPOINT:
+    testar_endpoint(ENDPOINT)
