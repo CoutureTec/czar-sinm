@@ -170,7 +170,7 @@ def ler_talhao(d):
         area=float(row["area"]),
         tipoProdutor=row["tipo_produtor"],
         plantioContorno=int(row["plantio_contorno"]),
-        cnpjOperador=CLIENT_ID,
+        cnpjOperador=_opt(row["cnpj_operador"]),
     )
 
 
