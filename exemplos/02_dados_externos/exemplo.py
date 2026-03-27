@@ -3,10 +3,12 @@ Exemplo de uso da biblioteca czarsinm com dados lidos de arquivos CSV.
 
 Uso:
     python example.py --dados dados/processo_001                                     # fluxo completo
+    python example.py --dados dados/processo_001 --acao listarSensoriamentos
     python example.py --dados dados/processo_001 --acao cadastraGleba
     python example.py --dados dados/processo_001 --acao cadastraAnaliseSolo   --chave_nm CHAVE
     python example.py --dados dados/processo_001 --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
     python example.py --dados dados/processo_001 --acao consultaClassificacaoNM  --chave_nm CHAVE
+    python example.py --dados dados/processo_001 --salvarRetornos                    # salva retornos em JSON
 
 Credenciais via arquivo .env (cp ../env.example .env).
 Os resultados de cada execução são gravados em <diretorio>/resultado.csv.
@@ -14,8 +16,10 @@ Os resultados de cada execução são gravados em <diretorio>/resultado.csv.
 
 import argparse
 import csv
+import json
 import logging
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,6 +37,7 @@ from czarsinm import (
 from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
+    "listarSensoriamentos",
     "cadastraGleba",
     "cadastraAnaliseSolo",
     "cadastraSensoriamentoRemoto",
@@ -58,6 +63,7 @@ parser.add_argument(
     default=None,
     help=(
         "Ação a executar. Se omitido, executa o fluxo completo.\n"
+        "  listarSensoriamentos\n"
         "  cadastraGleba\n"
         "  cadastraAnaliseSolo          (requer --chave_nm ou resultado.csv prévio)\n"
         "  cadastraSensoriamentoRemoto  (requer --chave_nm ou resultado.csv prévio)\n"
@@ -70,11 +76,18 @@ parser.add_argument(
     metavar="CHAVE",
     help="Chave de classificação NM. Se omitido, tenta ler do resultado.csv gerado por cadastraGleba.",
 )
+parser.add_argument(
+    "--salvarRetornos",
+    action="store_true",
+    default=False,
+    help="Se informado, salva o retorno de cada chamada à API em arquivos JSON no diretório de dados.",
+)
 args = parser.parse_args()
 
 DIRETORIO = Path(args.dados)
 ACAO = args.acao
 CHAVE_NM_ARG = args.chave_nm
+SALVAR_RETORNOS = args.salvarRetornos
 
 if not DIRETORIO.is_dir():
     parser.error(f"Diretório não encontrado: {DIRETORIO}")
@@ -306,6 +319,24 @@ def ler_sensoriamento_remoto(d):
 
 
 # --------------------------------------------------------------------------
+# Salvar retorno de chamadas à API em JSON
+# --------------------------------------------------------------------------
+
+def _salvar_retorno(nome_metodo, dados):
+    if not SALVAR_RETORNOS:
+        return
+    destino = DIRETORIO / f"{nome_metodo}.json"
+    if destino.exists():
+        sufixo = 1
+        while (DIRETORIO / f"{nome_metodo}{sufixo}.json").exists():
+            sufixo += 1
+        destino = DIRETORIO / f"{nome_metodo}{sufixo}.json"
+    with destino.open("w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+    print(f"  Retorno salvo em: {destino}")
+
+
+# --------------------------------------------------------------------------
 # Resultado CSV — leitura e escrita incremental
 # --------------------------------------------------------------------------
 
@@ -340,13 +371,33 @@ def salvar_resultado(dados):
 # Ações
 # --------------------------------------------------------------------------
 
+def listar_sensoriamentos():
+    print("\n=== Listando sensoriamentos remotos cadastrados ===")
+    try:
+        t0 = time.perf_counter()
+        sensoriamentos = client.listar_sensoriamentos_remotos()
+        elapsed = time.perf_counter() - t0
+        total = len(sensoriamentos) if isinstance(sensoriamentos, list) else "?"
+        print(f"Total de sensoriamentos: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("listarSensoriamentosRemotos", sensoriamentos)
+    except PermissaoError as exc:
+        print(exc.format_report())
+    except APIError as exc:
+        print(exc.format_report())
+
+
 def cadastra_gleba():
     print("\n=== Cadastrando talhão/gleba ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_gleba(ler_dado_gleba(DIRETORIO))
+        elapsed = time.perf_counter() - t0
         print("Gleba cadastrada com sucesso!")
         print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {resp.get('chaveClassificacaoNM')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarGleba", resp)
         resultado = ler_resultado()
         resultado["uuid_gleba"] = resp.get("uuid", "")
         resultado["chave_nm"] = resp.get("chaveClassificacaoNM", "")
@@ -363,11 +414,15 @@ def cadastra_gleba():
 def cadastra_analise_solo(chave_nm):
     print("\n=== Cadastrando análise de solo ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_analise_solo(
             ler_analise_solo(DIRETORIO), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarAnaliseSolo", resp)
         resultado = ler_resultado()
         resultado["uuid_analise_solo"] = resp.get("uuid", "")
         salvar_resultado(resultado)
@@ -380,11 +435,15 @@ def cadastra_analise_solo(chave_nm):
 def cadastra_sensoriamento_remoto(chave_nm):
     print("\n=== Cadastrando sensoriamento remoto ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_sensoriamento_remoto(
             ler_sensoriamento_remoto(DIRETORIO), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Sensoriamento remoto cadastrado com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarSensoriamentoRemoto", resp)
         resultado = ler_resultado()
         resultado["uuid_sensoriamento_remoto"] = resp.get("uuid", "")
         salvar_resultado(resultado)
@@ -398,9 +457,13 @@ def consulta_classificacao_nm(chave_nm):
     print("\n=== Consultando classificação de nível de manejo ===")
     resultado = ler_resultado()
     try:
+        t0 = time.perf_counter()
         classificacao = client.consultar_classificacao(chave_nm)
+        elapsed = time.perf_counter() - t0
         print(f"Classificação obtida para chave: {chave_nm}")
         print(f"  Resultado: {classificacao}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("consultarClassificacao", classificacao)
         resultado["status_classificacao"] = "disponivel"
         resultado["valor_classificacao"] = str(classificacao)
         salvar_resultado(resultado)
@@ -428,7 +491,10 @@ def _chave_nm_efetiva():
 # Despacho
 # --------------------------------------------------------------------------
 
-if ACAO == "cadastraGleba":
+if ACAO == "listarSensoriamentos":
+    listar_sensoriamentos()
+
+elif ACAO == "cadastraGleba":
     cadastra_gleba()
 
 elif ACAO == "cadastraAnaliseSolo":

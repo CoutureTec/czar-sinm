@@ -5,6 +5,7 @@ Uso:
     python example.py                                          # fluxo completo
     python example.py --acao autenticacao
     python example.py --acao listarGlebas
+    python example.py --acao listarSensoriamentos
     python example.py --acao cadastraGleba
     python example.py --acao cadastraAnaliseSolo   --chave_nm CHAVE
     python example.py --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
@@ -17,6 +18,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 
@@ -36,6 +38,7 @@ from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoErr
 ACOES = (
     "autenticacao",
     "listarGlebas",
+    "listarSensoriamentos",
     "cadastraGleba",
     "cadastraAnaliseSolo",
     "cadastraSensoriamentoRemoto",
@@ -57,6 +60,7 @@ parser.add_argument(
         "Ação a executar. Se omitido, executa o fluxo completo.\n"
         "  autenticacao\n"
         "  listarGlebas\n"
+        "  listarSensoriamentos\n"
         "  cadastraGleba\n"
         "  cadastraAnaliseSolo          (requer --chave_nm)\n"
         "  cadastraSensoriamentoRemoto  (requer --chave_nm)\n"
@@ -279,9 +283,29 @@ def autenticacao() -> None:
 def listar_glebas() -> None:
     print("\n=== Listando glebas cadastradas ===")
     try:
+        t0 = time.perf_counter()
         glebas = client.listar_glebas()
+        elapsed = time.perf_counter() - t0
         total = len(glebas) if isinstance(glebas, list) else "?"
         print(f"Total de glebas: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
+    except PermissaoError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+    except APIError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+
+
+def listar_sensoriamentos() -> None:
+    print("\n=== Listando sensoriamentos remotos cadastrados ===")
+    try:
+        t0 = time.perf_counter()
+        sensoriamentos = client.listar_sensoriamentos_remotos()
+        elapsed = time.perf_counter() - t0
+        total = len(sensoriamentos) if isinstance(sensoriamentos, list) else "?"
+        print(f"Total de sensoriamentos: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -294,11 +318,14 @@ def cadastra_gleba() -> str:
     """Cadastra gleba e retorna a chaveClassificacaoNM."""
     print("\n=== Cadastrando talhão/gleba ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_gleba(_dado_gleba())
+        elapsed = time.perf_counter() - t0
         chave = resp.get("chaveClassificacaoNM")
         print("Gleba cadastrada com sucesso!")
         print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {chave}")
+        print(f"  Tempo: {elapsed:.2f}s")
         # Linha parsável para captura em CI (ex: GitHub Actions)
         print(f"CHAVE_NM={chave}")
         return chave
@@ -313,9 +340,12 @@ def cadastra_gleba() -> str:
 def cadastra_analise_solo(chave_nm: str) -> None:
     print("\n=== Cadastrando análise de solo ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
+        elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
         print(f"  UUID: {resp.get('uuidAnaliseSolo')}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -327,11 +357,14 @@ def cadastra_analise_solo(chave_nm: str) -> None:
 def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
     print("\n=== Cadastrando sensoriamento remoto ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_sensoriamento_remoto(
             _sensoriamento_remoto(), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Sensoriamento remoto cadastrado com sucesso!")
         print(f"  UUID: {resp.get('uuidSensoriamentoRemoto')}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -343,9 +376,12 @@ def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
 def consulta_classificacao_nm(chave_nm: str) -> None:
     print("\n=== Consultando classificação de nível de manejo ===")
     try:
+        t0 = time.perf_counter()
         classificacao = client.consultar_classificacao(chave_nm)
+        elapsed = time.perf_counter() - t0
         print(f"Classificação obtida para chave: {chave_nm}")
         print(f"  Resultado: {classificacao}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except NotFoundError:
         print("Classificação ainda não disponível (processamento em andamento).")
     except PermissaoError as exc:
@@ -366,6 +402,10 @@ if ACAO == "autenticacao":
 elif ACAO == "listarGlebas":
     autenticacao()
     listar_glebas()
+
+elif ACAO == "listarSensoriamentos":
+    autenticacao()
+    listar_sensoriamentos()
 
 elif ACAO == "cadastraGleba":
     autenticacao()
