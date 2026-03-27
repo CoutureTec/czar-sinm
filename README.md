@@ -40,6 +40,35 @@ pip install git+https://github.com/CoutureTec/czar-sinm.git@v0.1.0
 ```
 
 
+## Início rápido
+
+```python
+from czarsinm import SINMClient
+from czarsinm.exceptions import PermissaoError, APIError
+
+client = SINMClient(
+    username="usuario@exemplo.com",
+    password="senha",
+    client_id="meu-client-id",
+    client_secret="meu-client-secret",
+    ambiente="hml",
+)
+
+# Verifica autenticação
+print("Roles:", client.roles)
+
+# Lista glebas cadastradas
+try:
+    glebas = client.listar_glebas()
+    print(f"{len(glebas)} gleba(s) encontrada(s)")
+except PermissaoError as e:
+    print(e.format_report())
+except APIError as e:
+    print(e.format_report())
+```
+
+Para exemplos completos com cadastro de gleba, análise de solo e sensoriamento remoto → [exemplos/README.md](exemplos/README.md)
+
 ## Estrutura da biblioteca
 
 ```
