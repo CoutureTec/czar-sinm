@@ -28,7 +28,7 @@ from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
-    AnaliseSolo, Amostra,
+    AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
     DadosInput,
@@ -189,27 +189,44 @@ def _analise_solo() -> AnaliseSolo:
     return AnaliseSolo(
         cpfProdutor="68122528082",
         cnpj="54194116000138",
-        amostras=[
+        amostrasQuimicas=[
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.108493 -22.811532)", camada="20",
-                areia=78.0, silte=5.0, argila=17.0, calcio=0.9, magnesio=0.8,
-                potassio=59.9, sodio=5.6, aluminio=0.36, acidezPotencial=5.0,
+                longitude=-47.108493, latitude=-22.811532, camada="00_020",
+                calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
+                aluminio=0.36, acidezPotencial=5.0,
                 phh2o=5.4, fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
             ),
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.106733 -22.812530)", camada="20",
-                areia=75.0, silte=6.0, argila=19.0, calcio=0.8, magnesio=0.7,
-                potassio=59.2, sodio=5.9, aluminio=0.36, acidezPotencial=4.4,
+                longitude=-47.106733, latitude=-22.812530, camada="00_020",
+                calcio=0.8, magnesio=0.7, potassio=59.2, sodio=5.9,
+                aluminio=0.36, acidezPotencial=4.4,
                 phh2o=5.5, fosforoMehlich=1.2, enxofre=7.3, mos=12.6,
             ),
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.103408 -22.812253)", camada="40",
-                areia=71.0, silte=7.0, argila=22.0, calcio=0.5, magnesio=1.1,
-                potassio=42.9, sodio=7.9, aluminio=1.215, acidezPotencial=5.2,
+                longitude=-47.103408, latitude=-22.812253, camada="20_040",
+                calcio=0.5, magnesio=1.1, potassio=42.9, sodio=7.9,
+                aluminio=1.215, acidezPotencial=5.2,
                 phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
+            ),
+        ],
+        amostrasFisicas=[
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.108493, latitude=-22.811532, camada="00_020",
+                areia=78.0, silte=5.0, argila=17.0,
+            ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.106733, latitude=-22.812530, camada="00_020",
+                areia=75.0, silte=6.0, argila=19.0,
+            ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.103408, latitude=-22.812253, camada="20_040",
+                areia=71.0, silte=7.0, argila=22.0,
             ),
         ],
     )

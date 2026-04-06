@@ -136,9 +136,9 @@ def amostra():
     return Amostra(
         cpfResponsavelColeta="21750077078",
         dataColeta="2024-09-17",
-        pontoColeta="POINT (-47.108493 -22.811532)",
-        camada="20",
-        areia=78.0, silte=5.0, argila=17.0,
+        longitude=-47.108493,
+        latitude=-22.811532,
+        camada="00_020",
         calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
         aluminio=0.36, acidezPotencial=5.0, phh2o=5.4,
         fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
@@ -150,7 +150,7 @@ def analise_solo(amostra):
     return AnaliseSolo(
         cpfProdutor="68122528082",
         cnpj="54194116000138",
-        amostras=[amostra],
+        amostrasQuimicas=[amostra],
     )
 
 

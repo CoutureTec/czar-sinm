@@ -30,7 +30,7 @@ from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
-    AnaliseSolo, Amostra,
+    AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
 )
@@ -236,32 +236,45 @@ def ler_dado_gleba(d):
 
 def ler_analise_solo(d):
     row = _csv(d / "analise_solo" / "analise_solo.csv")[0]
-    amostras = [
+    amostras_quimicas = [
         Amostra(
             cpfResponsavelColeta=a["cpf_responsavel_coleta"],
             dataColeta=a["data_coleta"],
-            pontoColeta=a["ponto_coleta"],
+            longitude=float(a["longitude"]),
+            latitude=float(a["latitude"]),
+            camada=a["camada"],
+            calcio=float(a["calcio"]),
+            magnesio=float(a["magnesio"]),
+            potassio=float(a["potassio"]),
+            sodio=float(a["sodio"]) if a.get("sodio") else None,
+            aluminio=float(a["aluminio"]),
+            acidezPotencial=float(a["acidez_potencial"]),
+            phh2o=float(a["ph_h2o"]) if a.get("ph_h2o") else None,
+            fosforoMehlich=float(a["fosforo_mehlich"]) if a.get("fosforo_mehlich") else None,
+            enxofre=float(a["enxofre"]),
+            mos=float(a["mos"]),
+        )
+        for a in _csv(d / "analise_solo" / "amostras_quimicas.csv")
+    ]
+    amostras_fisicas_path = d / "analise_solo" / "amostras_fisicas.csv"
+    amostras_fisicas = [
+        AmostraFisica(
+            cpfResponsavelColeta=a.get("cpf_responsavel_coleta") or None,
+            dataColeta=a["data_coleta"],
+            longitude=float(a["longitude"]),
+            latitude=float(a["latitude"]),
             camada=a["camada"],
             areia=float(a["areia"]),
             silte=float(a["silte"]),
             argila=float(a["argila"]),
-            calcio=float(a["calcio"]),
-            magnesio=float(a["magnesio"]),
-            potassio=float(a["potassio"]),
-            sodio=float(a["sodio"]),
-            aluminio=float(a["aluminio"]),
-            acidezPotencial=float(a["acidez_potencial"]),
-            phh2o=float(a["ph_h2o"]),
-            fosforoMehlich=float(a["fosforo_mehlich"]),
-            enxofre=float(a["enxofre"]),
-            mos=float(a["mos"]),
         )
-        for a in _csv(d / "analise_solo" / "amostras_solo.csv")
-    ]
+        for a in _csv(amostras_fisicas_path)
+    ] if amostras_fisicas_path.exists() else []
     return AnaliseSolo(
         cpfProdutor=row["cpf_produtor"],
         cnpj=row["cnpj"],
-        amostras=amostras,
+        amostrasQuimicas=amostras_quimicas,
+        amostrasFisicas=amostras_fisicas,
     )
 
 
