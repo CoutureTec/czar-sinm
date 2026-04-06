@@ -40,6 +40,7 @@ class KeycloakAuth:
         client_secret: str,
         ambiente: str = "hml",
         keycloak_url: Optional[str] = None,
+        keycloak_realm: Optional[str] = None,
         proxies: Optional[dict] = None,
     ):
         """
@@ -54,14 +55,34 @@ class KeycloakAuth:
         client_secret:
             Client secret fornecido pela equipe SINM.
         ambiente:
-            'hml' ou 'prd'. Define o realm utilizado.
+            'hml', 'prd' ou qualquer string para ambiente customizado.
+            Em ambientes customizados, 'keycloak_url' e 'keycloak_realm'
+            tornam-se obrigatórios.
         keycloak_url:
-            URL base do Keycloak. Se None, usa a URL padrão da Embrapa.
+            URL base do Keycloak incluindo o segmento /realms
+            (ex: 'https://meu-keycloak.exemplo.com/realms').
+            Obrigatório para ambientes customizados; se None, usa a URL padrão da Embrapa.
+        keycloak_realm:
+            Nome do realm no Keycloak.
+            Obrigatório para ambientes customizados; se None, usa o mapeamento
+            padrão (hml → zarcnm-h, prd → zarcnm).
         proxies:
             Dicionário de proxies requests (ex: {'https': 'http://proxy:3128'}).
         """
-        realm = REALMS.get(ambiente, ambiente)
-        base = keycloak_url or KEYCLOAK_BASE
+        if ambiente not in REALMS and keycloak_url is None:
+            raise ValueError(
+                f"Ambiente '{ambiente}' não reconhecido. "
+                "Para ambientes customizados, informe 'keycloak_url' "
+                "(ou defina SINM_KEYCLOAK no arquivo .env)."
+            )
+        if ambiente not in REALMS and keycloak_realm is None:
+            raise ValueError(
+                f"Ambiente '{ambiente}' não reconhecido. "
+                "Para ambientes customizados, informe 'keycloak_realm' "
+                "(ou defina SINM_KEYCLOAK_REALM no arquivo .env)."
+            )
+        realm = keycloak_realm or REALMS.get(ambiente, ambiente)
+        base = (keycloak_url or KEYCLOAK_BASE).rstrip("/")
         self._token_url = f"{base}/{realm}/protocol/openid-connect/token"
 
         self._credentials = {
@@ -106,6 +127,15 @@ class KeycloakAuth:
         """Retorna os realm roles do usuário extraídos do token JWT."""
         _ = self.token  # garante que o token está carregado
         return self._decode_token_roles(self._access_token or "")
+
+    @property
+    def client_roles(self) -> dict:
+        """Retorna todos os client roles do usuário agrupados por client ID.
+
+        Formato: {client_id: [role1, role2, ...]}
+        """
+        _ = self.token  # garante que o token está carregado
+        return self._decode_client_roles(self._access_token or "")
 
     # ------------------------------------------------------------------
     # Privado
@@ -168,11 +198,22 @@ class KeycloakAuth:
         logger.info("Token obtido, válido por %ss — roles: %s", data.get("expires_in"), roles)
 
     @staticmethod
-    def _decode_token_roles(token: str) -> List[str]:
-        """Extrai realm_access.roles do payload JWT sem verificar assinatura."""
+    def _jwt_payload(token: str) -> dict:
+        """Decodifica o payload de um JWT sem verificar assinatura."""
         try:
             payload_b64 = token.split(".")[1]
-            # Adiciona padding se necessário
+            padding = 4 - len(payload_b64) % 4
+            if padding != 4:
+                payload_b64 += "=" * padding
+            return json.loads(base64.urlsafe_b64decode(payload_b64))
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _decode_token_roles(token: str) -> List[str]:
+        """Extrai realm_access.roles do payload JWT."""
+        try:
+            payload_b64 = token.split(".")[1]
             padding = 4 - len(payload_b64) % 4
             if padding != 4:
                 payload_b64 += "=" * padding
@@ -180,3 +221,22 @@ class KeycloakAuth:
             return payload.get("realm_access", {}).get("roles", [])
         except Exception:
             return []
+
+    @staticmethod
+    def _decode_client_roles(token: str) -> dict:
+        """Extrai resource_access do payload JWT.
+
+        Retorna {client_id: [roles]} para todos os clients presentes no token.
+        """
+        try:
+            payload_b64 = token.split(".")[1]
+            padding = 4 - len(payload_b64) % 4
+            if padding != 4:
+                payload_b64 += "=" * padding
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+            return {
+                client: data.get("roles", [])
+                for client, data in payload.get("resource_access", {}).items()
+            }
+        except Exception:
+            return {}

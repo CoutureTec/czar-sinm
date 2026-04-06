@@ -3,10 +3,12 @@ Exemplo de uso da biblioteca czarsinm com dados lidos de arquivos CSV.
 
 Uso:
     python example.py --dados dados/processo_001                                     # fluxo completo
+    python example.py --dados dados/processo_001 --acao listarSensoriamentos
     python example.py --dados dados/processo_001 --acao cadastraGleba
     python example.py --dados dados/processo_001 --acao cadastraAnaliseSolo   --chave_nm CHAVE
     python example.py --dados dados/processo_001 --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
     python example.py --dados dados/processo_001 --acao consultaClassificacaoNM  --chave_nm CHAVE
+    python example.py --dados dados/processo_001 --salvarRetornos                    # salva retornos em JSON
 
 Credenciais via arquivo .env (cp ../env.example .env).
 Os resultados de cada execução são gravados em <diretorio>/resultado.csv.
@@ -14,8 +16,10 @@ Os resultados de cada execução são gravados em <diretorio>/resultado.csv.
 
 import argparse
 import csv
+import json
 import logging
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,13 +30,14 @@ from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
-    AnaliseSolo, Amostra,
+    AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
 )
 from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
 ACOES = (
+    "listarSensoriamentos",
     "cadastraGleba",
     "cadastraAnaliseSolo",
     "cadastraSensoriamentoRemoto",
@@ -58,6 +63,7 @@ parser.add_argument(
     default=None,
     help=(
         "Ação a executar. Se omitido, executa o fluxo completo.\n"
+        "  listarSensoriamentos\n"
         "  cadastraGleba\n"
         "  cadastraAnaliseSolo          (requer --chave_nm ou resultado.csv prévio)\n"
         "  cadastraSensoriamentoRemoto  (requer --chave_nm ou resultado.csv prévio)\n"
@@ -70,11 +76,18 @@ parser.add_argument(
     metavar="CHAVE",
     help="Chave de classificação NM. Se omitido, tenta ler do resultado.csv gerado por cadastraGleba.",
 )
+parser.add_argument(
+    "--salvarRetornos",
+    action="store_true",
+    default=False,
+    help="Se informado, salva o retorno de cada chamada à API em arquivos JSON no diretório de dados.",
+)
 args = parser.parse_args()
 
 DIRETORIO = Path(args.dados)
 ACAO = args.acao
 CHAVE_NM_ARG = args.chave_nm
+SALVAR_RETORNOS = args.salvarRetornos
 
 if not DIRETORIO.is_dir():
     parser.error(f"Diretório não encontrado: {DIRETORIO}")
@@ -82,19 +95,23 @@ if not DIRETORIO.is_dir():
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
+_log_level = logging.DEBUG if os.getenv("DEBUG", "").lower() == "true" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
 # --------------------------------------------------------------------------
 # Credenciais (.env)
 # --------------------------------------------------------------------------
-USUARIO       = os.environ["SINM_USERNAME"]
-SENHA         = os.environ["SINM_PASSWORD"]
-CLIENT_ID     = os.environ["SINM_CLIENT_ID"]
-CLIENT_SECRET = os.environ["SINM_CLIENT_SECRET"]
-AMBIENTE      = os.getenv("SINM_AMBIENTE", "hml")
+USUARIO        = os.environ["SINM_USERNAME"]
+SENHA          = os.environ["SINM_PASSWORD"]
+CLIENT_ID      = os.environ["SINM_CLIENT_ID"]
+CLIENT_SECRET  = os.environ["SINM_CLIENT_SECRET"]
+AMBIENTE       = os.getenv("SINM_AMBIENTE", "hml")
+BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
+KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
+KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
 
 # --------------------------------------------------------------------------
 # Client
@@ -105,12 +122,20 @@ client = SINMClient(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     ambiente=AMBIENTE,
+    base_url=BACKEND_URL,
+    keycloak_url=KEYCLOAK_URL,
+    keycloak_realm=KEYCLOAK_REALM,
 )
 
 print("\n=== Autenticação ===")
-roles = client.roles
-print(f"Usuário : {USUARIO}")
-print(f"Roles   : {roles}")
+roles        = client.roles
+client_roles = client.client_roles
+print(f"Usuário     : {USUARIO}")
+print(f"Realm roles : {roles}")
+for _client_id, _cr in client_roles.items():
+    print(f"Papeis de acesso no client {_client_id}:")
+    for _papel in _cr:
+        print(f"  - {_papel}")
 
 # --------------------------------------------------------------------------
 # Helpers de leitura de CSV
@@ -158,6 +183,7 @@ def ler_talhao(d):
         area=float(row["area"]),
         tipoProdutor=row["tipo_produtor"],
         plantioContorno=int(row["plantio_contorno"]),
+        cnpjOperador=_opt(row["cnpj_operador"]),
     )
 
 
@@ -210,32 +236,45 @@ def ler_dado_gleba(d):
 
 def ler_analise_solo(d):
     row = _csv(d / "analise_solo" / "analise_solo.csv")[0]
-    amostras = [
+    amostras_quimicas = [
         Amostra(
             cpfResponsavelColeta=a["cpf_responsavel_coleta"],
             dataColeta=a["data_coleta"],
-            pontoColeta=a["ponto_coleta"],
+            longitude=float(a["longitude"]),
+            latitude=float(a["latitude"]),
+            camada=a["camada"],
+            calcio=float(a["calcio"]),
+            magnesio=float(a["magnesio"]),
+            potassio=float(a["potassio"]),
+            sodio=float(a["sodio"]) if a.get("sodio") else None,
+            aluminio=float(a["aluminio"]),
+            acidezPotencial=float(a["acidez_potencial"]),
+            phh2o=float(a["ph_h2o"]) if a.get("ph_h2o") else None,
+            fosforoMehlich=float(a["fosforo_mehlich"]) if a.get("fosforo_mehlich") else None,
+            enxofre=float(a["enxofre"]),
+            mos=float(a["mos"]),
+        )
+        for a in _csv(d / "analise_solo" / "amostras_quimicas.csv")
+    ]
+    amostras_fisicas_path = d / "analise_solo" / "amostras_fisicas.csv"
+    amostras_fisicas = [
+        AmostraFisica(
+            cpfResponsavelColeta=a.get("cpf_responsavel_coleta") or None,
+            dataColeta=a["data_coleta"],
+            longitude=float(a["longitude"]),
+            latitude=float(a["latitude"]),
             camada=a["camada"],
             areia=float(a["areia"]),
             silte=float(a["silte"]),
             argila=float(a["argila"]),
-            calcio=float(a["calcio"]),
-            magnesio=float(a["magnesio"]),
-            potassio=float(a["potassio"]),
-            sodio=float(a["sodio"]),
-            aluminio=float(a["aluminio"]),
-            acidezPotencial=float(a["acidez_potencial"]),
-            phh2o=float(a["ph_h2o"]),
-            fosforoMehlich=float(a["fosforo_mehlich"]),
-            enxofre=float(a["enxofre"]),
-            mos=float(a["mos"]),
         )
-        for a in _csv(d / "analise_solo" / "amostras_solo.csv")
-    ]
+        for a in _csv(amostras_fisicas_path)
+    ] if amostras_fisicas_path.exists() else []
     return AnaliseSolo(
         cpfProdutor=row["cpf_produtor"],
         cnpj=row["cnpj"],
-        amostras=amostras,
+        amostrasQuimicas=amostras_quimicas,
+        amostrasFisicas=amostras_fisicas,
     )
 
 
@@ -293,6 +332,24 @@ def ler_sensoriamento_remoto(d):
 
 
 # --------------------------------------------------------------------------
+# Salvar retorno de chamadas à API em JSON
+# --------------------------------------------------------------------------
+
+def _salvar_retorno(nome_metodo, dados):
+    if not SALVAR_RETORNOS:
+        return
+    destino = DIRETORIO / f"{nome_metodo}.json"
+    if destino.exists():
+        sufixo = 1
+        while (DIRETORIO / f"{nome_metodo}{sufixo}.json").exists():
+            sufixo += 1
+        destino = DIRETORIO / f"{nome_metodo}{sufixo}.json"
+    with destino.open("w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+    print(f"  Retorno salvo em: {destino}")
+
+
+# --------------------------------------------------------------------------
 # Resultado CSV — leitura e escrita incremental
 # --------------------------------------------------------------------------
 
@@ -327,13 +384,33 @@ def salvar_resultado(dados):
 # Ações
 # --------------------------------------------------------------------------
 
+def listar_sensoriamentos():
+    print("\n=== Listando sensoriamentos remotos cadastrados ===")
+    try:
+        t0 = time.perf_counter()
+        sensoriamentos = client.listar_sensoriamentos_remotos()
+        elapsed = time.perf_counter() - t0
+        total = len(sensoriamentos) if isinstance(sensoriamentos, list) else "?"
+        print(f"Total de sensoriamentos: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("listarSensoriamentosRemotos", sensoriamentos)
+    except PermissaoError as exc:
+        print(exc.format_report())
+    except APIError as exc:
+        print(exc.format_report())
+
+
 def cadastra_gleba():
     print("\n=== Cadastrando talhão/gleba ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_gleba(ler_dado_gleba(DIRETORIO))
+        elapsed = time.perf_counter() - t0
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {resp.get('chaveClassificacaoNM')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarGleba", resp)
         resultado = ler_resultado()
         resultado["uuid_gleba"] = resp.get("uuid", "")
         resultado["chave_nm"] = resp.get("chaveClassificacaoNM", "")
@@ -350,11 +427,15 @@ def cadastra_gleba():
 def cadastra_analise_solo(chave_nm):
     print("\n=== Cadastrando análise de solo ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_analise_solo(
             ler_analise_solo(DIRETORIO), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarAnaliseSolo", resp)
         resultado = ler_resultado()
         resultado["uuid_analise_solo"] = resp.get("uuid", "")
         salvar_resultado(resultado)
@@ -367,11 +448,15 @@ def cadastra_analise_solo(chave_nm):
 def cadastra_sensoriamento_remoto(chave_nm):
     print("\n=== Cadastrando sensoriamento remoto ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_sensoriamento_remoto(
             ler_sensoriamento_remoto(DIRETORIO), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Sensoriamento remoto cadastrado com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("cadastrarSensoriamentoRemoto", resp)
         resultado = ler_resultado()
         resultado["uuid_sensoriamento_remoto"] = resp.get("uuid", "")
         salvar_resultado(resultado)
@@ -385,9 +470,13 @@ def consulta_classificacao_nm(chave_nm):
     print("\n=== Consultando classificação de nível de manejo ===")
     resultado = ler_resultado()
     try:
+        t0 = time.perf_counter()
         classificacao = client.consultar_classificacao(chave_nm)
+        elapsed = time.perf_counter() - t0
         print(f"Classificação obtida para chave: {chave_nm}")
         print(f"  Resultado: {classificacao}")
+        print(f"  Tempo: {elapsed:.2f}s")
+        _salvar_retorno("consultarClassificacao", classificacao)
         resultado["status_classificacao"] = "disponivel"
         resultado["valor_classificacao"] = str(classificacao)
         salvar_resultado(resultado)
@@ -415,7 +504,10 @@ def _chave_nm_efetiva():
 # Despacho
 # --------------------------------------------------------------------------
 
-if ACAO == "cadastraGleba":
+if ACAO == "listarSensoriamentos":
+    listar_sensoriamentos()
+
+elif ACAO == "cadastraGleba":
     cadastra_gleba()
 
 elif ACAO == "cadastraAnaliseSolo":
@@ -437,8 +529,8 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(chave)
 
 else:
-    # Fluxo completo
-    chave_nm = _chave_nm_efetiva() or cadastra_gleba()
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)

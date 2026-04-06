@@ -75,9 +75,11 @@ class Talhao:
     """Tipo de produtor: 'Proprietário' ou 'Arrendatário'."""
     plantioContorno: int
     """Plantio em contorno: 0 (não) ou 1 (sim)."""
+    cnpjOperador: Optional[str] = None
+    """CNPJ da empresa operadora (client ID no Keycloak). Opcional."""
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _remove_none(asdict(self))
 
 
 @dataclass
@@ -119,8 +121,8 @@ class CoberturaSolo:
     """Avaliação de cobertura do solo (palhada)."""
     dataAvaliacao: str
     """Data da avaliação (formato 'YYYY-MM-DD')."""
-    porcentualPalhada: float
-    """Percentual de palhada (0–100)."""
+    porcentualPalhada: int
+    """Percentual de palhada (0–100), valor inteiro."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -231,46 +233,92 @@ class DadosInput:
 # ---------------------------------------------------------------------------
 
 @dataclass
-class Amostra:
-    """Amostra de solo coletada."""
+class Ponto:
+    """Ponto geográfico adicional associado a uma amostra."""
+    longitude: float
+    latitude: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class AmostraQuimica:
+    """Amostra química de solo coletada (AmostraQuimicaInput)."""
     cpfResponsavelColeta: str
     """CPF do responsável pela coleta (somente dígitos)."""
     dataColeta: str
     """Data da coleta (formato 'YYYY-MM-DD')."""
-    pontoColeta: str
-    """Ponto WKT da coleta. Ex: 'POINT (-47.108493 -22.811532)'"""
+    longitude: float
+    """Longitude do ponto de coleta."""
+    latitude: float
+    """Latitude do ponto de coleta."""
     camada: str
-    """Camada de coleta em cm. Ex: '20' ou '40'."""
-    areia: float
-    """Areia em g/kg (0–100)."""
-    silte: float
-    """Silte em g/kg (0–100)."""
-    argila: float
-    """Argila em g/kg (0–100)."""
+    """Camada de coleta (6 caracteres). Valores aceitos: '00_010', '10_020',
+    '00_020', '20_040', '00_040', '40_060', '60_100'."""
     calcio: float
     """Cálcio em cmolc/dm³ (0–50)."""
     magnesio: float
     """Magnésio em cmolc/dm³ (0–30)."""
     potassio: float
     """Potássio em mg/dm³ (0–1000)."""
-    sodio: float
-    """Sódio em mg/dm³ (0–1000)."""
     aluminio: float
     """Alumínio em cmolc/dm³ (0–100)."""
     acidezPotencial: float
     """Acidez potencial H+Al em cmolc/dm³ (0–100)."""
-    phh2o: float
-    """pH em água (0–14)."""
-    fosforoMehlich: float
-    """Fósforo Mehlich em mg/dm³ (0–100)."""
     enxofre: float
     """Enxofre em mg/dm³ (0–100)."""
     mos: float
     """Matéria orgânica do solo em g/kg (0–300)."""
+    sodio: Optional[float] = None
+    """Sódio em mg/dm³ (0–1000). Opcional."""
+    phh2o: Optional[float] = None
+    """pH em água (0–14). Opcional."""
     phcacl2: Optional[float] = None
     """pH em CaCl2 (0–14). Opcional."""
+    fosforoMehlich: Optional[float] = None
+    """Fósforo Mehlich em mg/dm³ (0–100). Opcional."""
     fosforoResina: Optional[float] = None
     """Fósforo Resina em mg/dm³ (0–100). Opcional."""
+    arilsulfatase: Optional[float] = None
+    """Arilsulfatase em nmol/g/h (0–800). Opcional."""
+    betaGlicosidade: Optional[float] = None
+    """Beta-glicosidade em nmol/g/h (0–500). Opcional."""
+    densidadeSolo: Optional[float] = None
+    """Densidade do solo em g/cm³ (0–3). Opcional."""
+    pontos: list[Ponto] = field(default_factory=list)
+    """Pontos geográficos adicionais. Opcional."""
+
+    def to_dict(self) -> dict:
+        return _remove_none(asdict(self))
+
+
+# Alias para compatibilidade com código existente
+Amostra = AmostraQuimica
+
+
+@dataclass
+class AmostraFisica:
+    """Amostra física de solo coletada (AmostraFisicaInput)."""
+    dataColeta: str
+    """Data da coleta (formato 'YYYY-MM-DD')."""
+    longitude: float
+    """Longitude do ponto de coleta."""
+    latitude: float
+    """Latitude do ponto de coleta."""
+    camada: str
+    """Camada de coleta (6 caracteres). Valores aceitos: '00_010', '10_020',
+    '00_020', '20_040', '00_040', '40_060', '60_100'."""
+    areia: float
+    """Areia em g/kg (0–100)."""
+    silte: float
+    """Silte em g/kg (0–100)."""
+    argila: float
+    """Argila em g/kg (0–100)."""
+    cpfResponsavelColeta: Optional[str] = None
+    """CPF do responsável pela coleta (somente dígitos). Opcional."""
+    pontos: list[Ponto] = field(default_factory=list)
+    """Pontos geográficos adicionais. Opcional."""
 
     def to_dict(self) -> dict:
         return _remove_none(asdict(self))
@@ -283,19 +331,27 @@ class AnaliseSolo:
 
     Corresponde ao AnaliseSoloInput da API.
     """
-    amostras: list[Amostra]
-    """Mínimo 1 amostra obrigatória."""
+    amostrasQuimicas: list[AmostraQuimica]
+    """Mínimo 1 amostra química obrigatória."""
     cpfProdutor: Optional[str] = None
     """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
     cnpj: Optional[str] = None
     """CNPJ da empresa (opcional)."""
+    cnpjLaboratorio: Optional[str] = None
+    """CNPJ do laboratório (14 dígitos). Opcional."""
+    amostrasFisicas: list[AmostraFisica] = field(default_factory=list)
+    """Amostras físicas de solo. Opcional."""
 
     def to_dict(self) -> dict:
-        d: dict = {"amostras": [a.to_dict() for a in self.amostras]}
+        d: dict = {"amostrasQuimicas": [a.to_dict() for a in self.amostrasQuimicas]}
+        if self.amostrasFisicas:
+            d["amostrasFisicas"] = [a.to_dict() for a in self.amostrasFisicas]
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
         if self.cnpj:
             d["cnpj"] = self.cnpj
+        if self.cnpjLaboratorio:
+            d["cnpjLaboratorio"] = self.cnpjLaboratorio
         return d
 
 
@@ -326,8 +382,8 @@ class InterpretacaoCoberturaSolo:
     """Interpretação de cobertura do solo via satélite."""
     dataAvaliacao: str
     """Data da avaliação (formato 'YYYY-MM-DD')."""
-    porcentualPalhada: float
-    """Percentual de palhada (0–100)."""
+    porcentualPalhada: int
+    """Percentual de palhada (0–100), valor inteiro."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -370,8 +426,8 @@ class SensoriamentoRemoto:
     """Data inicial do período monitorado (formato 'YYYY-MM-DD')."""
     dataFinal: str
     """Data final do período monitorado (formato 'YYYY-MM-DD')."""
-    declividadeMedia: float
-    """Declividade média do talhão (0–100)."""
+    declividadeMedia: int
+    """Declividade média do talhão (0–100), valor inteiro."""
     plantioContorno: int
     """Plantio em contorno detectado: 0 ou 1."""
     terraceamento: int

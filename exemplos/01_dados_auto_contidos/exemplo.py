@@ -5,6 +5,7 @@ Uso:
     python example.py                                          # fluxo completo
     python example.py --acao autenticacao
     python example.py --acao listarGlebas
+    python example.py --acao listarSensoriamentos
     python example.py --acao cadastraGleba
     python example.py --acao cadastraAnaliseSolo   --chave_nm CHAVE
     python example.py --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
@@ -17,6 +18,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 
@@ -26,7 +28,7 @@ from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
     Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
-    AnaliseSolo, Amostra,
+    AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
     DadosInput,
@@ -36,6 +38,7 @@ from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoErr
 ACOES = (
     "autenticacao",
     "listarGlebas",
+    "listarSensoriamentos",
     "cadastraGleba",
     "cadastraAnaliseSolo",
     "cadastraSensoriamentoRemoto",
@@ -57,6 +60,7 @@ parser.add_argument(
         "Ação a executar. Se omitido, executa o fluxo completo.\n"
         "  autenticacao\n"
         "  listarGlebas\n"
+        "  listarSensoriamentos\n"
         "  cadastraGleba\n"
         "  cadastraAnaliseSolo          (requer --chave_nm)\n"
         "  cadastraSensoriamentoRemoto  (requer --chave_nm)\n"
@@ -82,19 +86,23 @@ if ACAO in ("cadastraAnaliseSolo", "cadastraSensoriamentoRemoto", "consultaClass
 # --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
+_log_level = logging.DEBUG if os.getenv("DEBUG", "").lower() == "true" else logging.INFO
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
 # --------------------------------------------------------------------------
 # Credenciais (.env)
 # --------------------------------------------------------------------------
-USUARIO       = os.environ["SINM_USERNAME"]
-SENHA         = os.environ["SINM_PASSWORD"]
-CLIENT_ID     = os.environ["SINM_CLIENT_ID"]
-CLIENT_SECRET = os.environ["SINM_CLIENT_SECRET"]
-AMBIENTE      = os.getenv("SINM_AMBIENTE", "hml")
+USUARIO        = os.environ["SINM_USERNAME"]
+SENHA          = os.environ["SINM_PASSWORD"]
+CLIENT_ID      = os.environ["SINM_CLIENT_ID"]
+CLIENT_SECRET  = os.environ["SINM_CLIENT_SECRET"]
+AMBIENTE       = os.getenv("SINM_AMBIENTE", "hml")
+BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
+KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
+KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
 
 # --------------------------------------------------------------------------
 # Client
@@ -105,6 +113,9 @@ client = SINMClient(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     ambiente=AMBIENTE,
+    base_url=BACKEND_URL,
+    keycloak_url=KEYCLOAK_URL,
+    keycloak_realm=KEYCLOAK_REALM,
 )
 
 # --------------------------------------------------------------------------
@@ -145,6 +156,7 @@ def _dado_gleba() -> DadoGleba:
             area=32.0,
             tipoProdutor="Proprietário",
             plantioContorno=1,
+            cnpjOperador=CLIENT_ID,
         ),
         manejos=[
             Manejo(
@@ -177,27 +189,56 @@ def _analise_solo() -> AnaliseSolo:
     return AnaliseSolo(
         cpfProdutor="68122528082",
         cnpj="54194116000138",
-        amostras=[
+        amostrasQuimicas=[
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.108493 -22.811532)", camada="20",
-                areia=78.0, silte=5.0, argila=17.0, calcio=0.9, magnesio=0.8,
-                potassio=59.9, sodio=5.6, aluminio=0.36, acidezPotencial=5.0,
+                longitude=-47.108493, latitude=-22.811532, camada="00_020",
+                calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
+                aluminio=0.36, acidezPotencial=5.0,
                 phh2o=5.4, fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
             ),
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.106733 -22.812530)", camada="20",
-                areia=75.0, silte=6.0, argila=19.0, calcio=0.8, magnesio=0.7,
-                potassio=59.2, sodio=5.9, aluminio=0.36, acidezPotencial=4.4,
+                longitude=-47.106733, latitude=-22.812530, camada="00_020",
+                calcio=0.8, magnesio=0.7, potassio=59.2, sodio=5.9,
+                aluminio=0.36, acidezPotencial=4.4,
                 phh2o=5.5, fosforoMehlich=1.2, enxofre=7.3, mos=12.6,
             ),
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
-                pontoColeta="POINT (-47.103408 -22.812253)", camada="40",
-                areia=71.0, silte=7.0, argila=22.0, calcio=0.5, magnesio=1.1,
-                potassio=42.9, sodio=7.9, aluminio=1.215, acidezPotencial=5.2,
+                longitude=-47.103408, latitude=-22.812253, camada="20_040",
+                calcio=0.5, magnesio=1.1, potassio=42.9, sodio=7.9,
+                aluminio=1.215, acidezPotencial=5.2,
                 phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
+            ),
+            Amostra(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-18",
+                longitude=-47.103418, latitude=-22.812263, camada="20_040",
+                calcio=0.5, magnesio=1.2, potassio=42.9, sodio=7.9,
+                aluminio=1.215, acidezPotencial=5.2,
+                phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
+            ),
+        ],
+        amostrasFisicas=[
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.108493, latitude=-22.811532, camada="00_020",
+                areia=78.0, silte=5.0, argila=17.0,
+            ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.106733, latitude=-22.812530, camada="00_020",
+                areia=75.0, silte=6.0, argila=19.0,
+            ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.103408, latitude=-22.812253, camada="20_040",
+                areia=71.0, silte=7.0, argila=22.0,
+            ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.103418, latitude=-22.811531, camada="20_040",
+                areia=71.0, silte=8.0, argila=22.0,
             ),
         ],
     )
@@ -255,10 +296,15 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
 
 def autenticacao() -> None:
     print("\n=== Autenticação ===")
-    roles = client.roles
-    print(f"Usuário : {USUARIO}")
-    print(f"Roles   : {roles}")
-    if not roles:
+    roles        = client.roles
+    client_roles = client.client_roles
+    print(f"Usuário     : {USUARIO}")
+    print(f"Realm roles : {roles}")
+    for client_id, cr in client_roles.items():
+        print(f"Papeis de acesso no client {client_id}:")
+        for papel in cr:
+            print(f"  - {papel}")
+    if not roles and not client_roles:
         print("ERRO: nenhum role encontrado no token.", file=sys.stderr)
         sys.exit(1)
 
@@ -266,9 +312,29 @@ def autenticacao() -> None:
 def listar_glebas() -> None:
     print("\n=== Listando glebas cadastradas ===")
     try:
+        t0 = time.perf_counter()
         glebas = client.listar_glebas()
+        elapsed = time.perf_counter() - t0
         total = len(glebas) if isinstance(glebas, list) else "?"
         print(f"Total de glebas: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
+    except PermissaoError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+    except APIError as exc:
+        print(exc.format_report(), file=sys.stderr)
+        sys.exit(1)
+
+
+def listar_sensoriamentos() -> None:
+    print("\n=== Listando sensoriamentos remotos cadastrados ===")
+    try:
+        t0 = time.perf_counter()
+        sensoriamentos = client.listar_sensoriamentos_remotos()
+        elapsed = time.perf_counter() - t0
+        total = len(sensoriamentos) if isinstance(sensoriamentos, list) else "?"
+        print(f"Total de sensoriamentos: {total}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -281,11 +347,14 @@ def cadastra_gleba() -> str:
     """Cadastra gleba e retorna a chaveClassificacaoNM."""
     print("\n=== Cadastrando talhão/gleba ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_gleba(_dado_gleba())
+        elapsed = time.perf_counter() - t0
         chave = resp.get("chaveClassificacaoNM")
         print("Gleba cadastrada com sucesso!")
-        print(f"  UUID              : {resp.get('uuid')}")
+        print(f"  UUID              : {resp.get('uuidGleba')}")
         print(f"  Chave Classificação NM: {chave}")
+        print(f"  Tempo: {elapsed:.2f}s")
         # Linha parsável para captura em CI (ex: GitHub Actions)
         print(f"CHAVE_NM={chave}")
         return chave
@@ -300,9 +369,12 @@ def cadastra_gleba() -> str:
 def cadastra_analise_solo(chave_nm: str) -> None:
     print("\n=== Cadastrando análise de solo ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
+        elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidAnaliseSolo')}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -314,11 +386,14 @@ def cadastra_analise_solo(chave_nm: str) -> None:
 def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
     print("\n=== Cadastrando sensoriamento remoto ===")
     try:
+        t0 = time.perf_counter()
         resp = client.cadastrar_sensoriamento_remoto(
             _sensoriamento_remoto(), chave_classificacao_nm=chave_nm
         )
+        elapsed = time.perf_counter() - t0
         print("Sensoriamento remoto cadastrado com sucesso!")
-        print(f"  UUID: {resp.get('uuid')}")
+        print(f"  UUID: {resp.get('uuidSensoriamentoRemoto')}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)
         sys.exit(1)
@@ -330,9 +405,12 @@ def cadastra_sensoriamento_remoto(chave_nm: str) -> None:
 def consulta_classificacao_nm(chave_nm: str) -> None:
     print("\n=== Consultando classificação de nível de manejo ===")
     try:
+        t0 = time.perf_counter()
         classificacao = client.consultar_classificacao(chave_nm)
+        elapsed = time.perf_counter() - t0
         print(f"Classificação obtida para chave: {chave_nm}")
         print(f"  Resultado: {classificacao}")
+        print(f"  Tempo: {elapsed:.2f}s")
     except NotFoundError:
         print("Classificação ainda não disponível (processamento em andamento).")
     except PermissaoError as exc:
@@ -354,6 +432,10 @@ elif ACAO == "listarGlebas":
     autenticacao()
     listar_glebas()
 
+elif ACAO == "listarSensoriamentos":
+    autenticacao()
+    listar_sensoriamentos()
+
 elif ACAO == "cadastraGleba":
     autenticacao()
     cadastra_gleba()
@@ -371,9 +453,9 @@ elif ACAO == "consultaClassificacaoNM":
     consulta_classificacao_nm(CHAVE_NM)
 
 else:
-    # Fluxo completo
+    # Fluxo completo: cadastra gleba, análise, sensoriamento e consulta classificação
     autenticacao()
-    chave_nm = CHAVE_NM or cadastra_gleba()
+    chave_nm = cadastra_gleba()
     if chave_nm:
         cadastra_analise_solo(chave_nm)
         cadastra_sensoriamento_remoto(chave_nm)

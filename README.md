@@ -27,12 +27,108 @@ Há exemplos de uso com dados embutidos no código e com dados em arquivos CSV.
 
 ## Instalação
 
-**Via GitHub com tag (recomendado):**
+**Via PyPI (recomendado):**
 
 ```bash
-pip install git+https://github.com/CoutureTec/czar-sinm.git@v1.0.0
+pip install czar-sinm
 ```
 
+**Via GitHub com tag:**
+
+```bash
+pip install git+https://github.com/CoutureTec/czar-sinm.git@v0.1.0
+```
+
+
+## Início rápido
+
+### Exploração interativa (sem configuração prévia)
+
+A forma mais rápida de testar a biblioteca é usando a interface interativa,
+que **não exige configuração prévia**: se não houver um arquivo `.env`, ela
+solicita as credenciais diretamente no terminal e oferece salvar para as
+próximas execuções.
+
+```bash
+cd exemplos/04_interativo
+python exemplo.py
+```
+
+Na primeira execução sem `.env`, você verá:
+
+```
+================================================================
+  SINM — Credenciais
+================================================================
+  Arquivo .env não encontrado.
+  Preencha as credenciais abaixo (senha não será exibida):
+
+  Usuário       (SINM_USERNAME)    :
+  Senha         (SINM_PASSWORD)    :
+  Client ID     (SINM_CLIENT_ID)   :
+  Client Secret (SINM_CLIENT_SECRET):
+  Ambiente      [hml/prd, Enter=hml]:
+```
+
+Após autenticar, um menu completo é exibido com todas as operações
+disponíveis — listar, cadastrar, buscar e consultar recursos — organizado
+por domínio:
+
+```
+================================================================
+  SINM — Interface Interativa  |  HML
+  Usuário : joao.silva@empresa.com.br
+================================================================
+
+  GLEBAS
+  [ 1] Listar Glebas
+  [ 2] Cadastrar Gleba
+  [ 3] Buscar Gleba por UUID
+
+  ANÁLISE DE SOLO
+  [ 4] Listar Análises de Solo
+  ...
+
+  CONTA
+  [12] Definir CNPJ Operador Ativo
+  [13] Ver Autorizações Completas
+
+  [ 0] Sair
+================================================================
+  Opção:
+```
+
+Consulte o [README do exemplo interativo](exemplos/04_interativo/README.md)
+para detalhes sobre todas as opções do menu.
+
+### Uso via código
+
+```python
+from czarsinm import SINMClient
+from czarsinm.exceptions import PermissaoError, APIError
+
+client = SINMClient(
+    username="usuario@exemplo.com",
+    password="senha",
+    client_id="meu-client-id",
+    client_secret="meu-client-secret",
+    ambiente="hml",
+)
+
+# Verifica autenticação
+print("Roles:", client.roles)
+
+# Lista glebas cadastradas
+try:
+    glebas = client.listar_glebas()
+    print(f"{len(glebas)} gleba(s) encontrada(s)")
+except PermissaoError as e:
+    print(e.format_report())
+except APIError as e:
+    print(e.format_report())
+```
+
+Para exemplos completos com cadastro de gleba, análise de solo e sensoriamento remoto → [exemplos/README.md](exemplos/README.md)
 
 ## Estrutura da biblioteca
 
@@ -126,8 +222,6 @@ except APIError as e:
 ║    • OPERADOR_CONTRATOS                                     ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Roles aceitos por '/api/v1/analises-solo/MINHA_CHAVE':    ║
-║    ✗ ADMINISTRADOR                                         ║
-║    ✗ BETA_USER                                             ║
 ║    ✗ OPERADOR_ANALISE_SOLO                                 ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Solicite à equipe SiNM um dos roles acima                 ║
