@@ -169,15 +169,26 @@ class TestAmostra:
         d = amostra.to_dict()
         assert "phcacl2" not in d
         assert "fosforoResina" not in d
-        assert d["areia"] == 78.0
-        assert d["camada"] == "20"
+        assert "areia" not in d
+        assert "silte" not in d
+        assert "argila" not in d
+        assert "pontoColeta" not in d
+        assert d["longitude"] == -47.108493
+        assert d["latitude"] == -22.811532
+        assert d["camada"] == "00_020"
 
     def test_to_dict_com_campos_opcionais(self, amostra):
         amostra.phcacl2 = 5.1
         amostra.fosforoResina = 2.3
+        amostra.arilsulfatase = 100.0
+        amostra.betaGlicosidade = 50.0
+        amostra.densidadeSolo = 1.2
         d = amostra.to_dict()
         assert d["phcacl2"] == 5.1
         assert d["fosforoResina"] == 2.3
+        assert d["arilsulfatase"] == 100.0
+        assert d["betaGlicosidade"] == 50.0
+        assert d["densidadeSolo"] == 1.2
 
 
 # ---------------------------------------------------------------------------
@@ -189,11 +200,12 @@ class TestAnaliseSolo:
         d = analise_solo.to_dict()
         assert d["cpfProdutor"] == "68122528082"
         assert d["cnpj"] == "54194116000138"
-        assert isinstance(d["amostras"], list)
-        assert len(d["amostras"]) == 1
+        assert isinstance(d["amostrasQuimicas"], list)
+        assert len(d["amostrasQuimicas"]) == 1
+        assert "amostrasFisicas" not in d
 
     def test_to_dict_sem_cpf_e_cnpj(self, amostra):
-        a = AnaliseSolo(amostras=[amostra])
+        a = AnaliseSolo(amostrasQuimicas=[amostra])
         d = a.to_dict()
         assert "cpfProdutor" not in d
         assert "cnpj" not in d
