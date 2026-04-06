@@ -228,6 +228,11 @@ def _analise_solo() -> AnaliseSolo:
                 longitude=-47.103408, latitude=-22.812253, camada="20_040",
                 areia=71.0, silte=7.0, argila=22.0,
             ),
+            AmostraFisica(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                longitude=-47.103418, latitude=-22.811531, camada="20_040",
+                areia=71.0, silte=8.0, argila=22.0,
+            ),
         ],
     )
 
