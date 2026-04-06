@@ -211,6 +211,13 @@ def _analise_solo() -> AnaliseSolo:
                 aluminio=1.215, acidezPotencial=5.2,
                 phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
             ),
+            Amostra(
+                cpfResponsavelColeta="21750077078", dataColeta="2024-09-18",
+                longitude=-47.103418, latitude=-22.812263, camada="20_040",
+                calcio=0.5, magnesio=1.2, potassio=42.9, sodio=7.9,
+                aluminio=1.215, acidezPotencial=5.2,
+                phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
+            ),
         ],
         amostrasFisicas=[
             AmostraFisica(
