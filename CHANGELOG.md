@@ -14,6 +14,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Workflow de CI com GitHub Actions (`.github/workflows/ci.yml`)
 - `CONTRIBUTING.md` com guia de contribuição
 
+### Alterado
+- `Indice`: campo `coordenada` (string WKT) substituído por `longitude: float` e `latitude: float` separados, alinhando com a nova interface do zarc-nm
+
 ---
 
 ## [0.1.0] — 2025-04-01
