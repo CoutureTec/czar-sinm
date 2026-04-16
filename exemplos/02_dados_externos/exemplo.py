@@ -284,7 +284,8 @@ def ler_sensoriamento_remoto(d):
     indices = [
         Indice(
             codigoSatelite=i["codigo_satelite"],
-            coordenada=i["coordenada"],
+            longitude=float(i["longitude"]),
+            latitude=float(i["latitude"]),
             data=i["data"],
             ndvi=float(i["ndvi"]),
             ndti=float(i["ndti"]),
