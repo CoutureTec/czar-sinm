@@ -1,7 +1,7 @@
 # czarsinm — Cliente da API do SiNM
 
 [![CI](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml)
-[![Release](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml)
+[![Release](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml)
 
 Biblioteca Python para integração com a **SiNM** (Sistema de Informações de Níveis de Manejo).
 
