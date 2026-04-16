@@ -170,7 +170,8 @@ def sensoriamento_remoto():
         indices=[
             Indice(
                 codigoSatelite="S01",
-                coordenada="POINT (-47.108493 -22.811532)",
+                longitude=-47.108493,
+                latitude=-22.811532,
                 data="2021-01-17",
                 ndvi=0.5363,
                 ndti=0.3363,

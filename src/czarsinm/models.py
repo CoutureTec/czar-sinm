@@ -364,8 +364,10 @@ class Indice:
     """Índice de vegetação de satélite."""
     codigoSatelite: str
     """Código do satélite. Ex: 'S01'."""
-    coordenada: str
-    """Coordenada WKT do ponto. Ex: 'POINT (-47.108493 -22.811532)'"""
+    longitude: float
+    """Longitude do ponto de observação."""
+    latitude: float
+    """Latitude do ponto de observação."""
     data: str
     """Data da observação (formato 'YYYY-MM-DD')."""
     ndvi: float
