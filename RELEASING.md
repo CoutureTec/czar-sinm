@@ -45,7 +45,7 @@ git push origin develop
 Abra um PR de `develop` → `main`, aguarde os testes de CI passarem e faça o merge. Depois:
 
 ```bash
-git checkout main && git pull
+git checkout main && git pull origin main
 git tag v0.2.0
 git push origin v0.2.0
 ```
