@@ -246,21 +246,21 @@ def _analise_solo() -> AnaliseSolo:
 
 def _sensoriamento_remoto() -> SensoriamentoRemoto:
     indices = [
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2021-01-17", ndvi=0.5363, ndti=0.3363),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2021-04-07", ndvi=0.8810, ndti=0.6810),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2022-04-07", ndvi=0.9119, ndti=0.7119),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2022-09-01", ndvi=0.3342, ndti=0.1342),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2023-03-30", ndvi=0.9151, ndti=0.7151),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2023-09-22", ndvi=0.3370, ndti=0.1370),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2024-03-29", ndvi=0.9355, ndti=0.7355),
-        Indice(codigoSatelite="S01", coordenada="POINT (-47.108493 -22.811532)",
+        Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
                data="2024-05-08", ndvi=0.9153, ndti=0.7153),
     ]
     return SensoriamentoRemoto(
