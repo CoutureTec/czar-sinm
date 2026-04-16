@@ -219,13 +219,16 @@ class TestIndice:
     def test_to_dict(self):
         i = Indice(
             codigoSatelite="S01",
-            coordenada="POINT (-47.1 -22.8)",
+            longitude=-47.1,
+            latitude=-22.8,
             data="2021-01-17",
             ndvi=0.5363,
             ndti=0.3363,
         )
         d = i.to_dict()
         assert d["codigoSatelite"] == "S01"
+        assert d["longitude"] == -47.1
+        assert d["latitude"] == -22.8
         assert d["ndvi"] == 0.5363
         assert d["ndti"] == 0.3363
 
@@ -260,7 +263,8 @@ class TestSensoriamentoRemoto:
             indices=[
                 Indice(
                     codigoSatelite="S01",
-                    coordenada="POINT (-47.1 -22.8)",
+                    longitude=-47.1,
+                    latitude=-22.8,
                     data="2021-01-17",
                     ndvi=0.5,
                     ndti=0.3,
@@ -282,7 +286,7 @@ class TestSensoriamentoRemoto:
             terraceamento=0,
             codigoSateliteDeclividadeMedia="S09",
             indices=[
-                Indice("S01", "POINT (0 0)", "2021-01-01", 0.5, 0.3)
+                Indice("S01", 0.0, 0.0, "2021-01-01", 0.5, 0.3)
             ],
         )
         d = sr.to_dict()
