@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [0.2.1] — 2025-04-01
+
 ### Adicionado
 - Exemplos de uso com dados auto-contidos (`exemplos/01_dados_auto_contidos/`)
 - Exemplos de uso com dados em arquivos CSV (`exemplos/dados_externos/`)
@@ -16,6 +18,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Alterado
 - `Indice`: campo `coordenada` (string WKT) substituído por `longitude: float` e `latitude: float` separados, alinhando com a nova interface do zarc-nm
+- Autorização entre clients (empresas) e não entre usuários e clients.
 
 ---
 
