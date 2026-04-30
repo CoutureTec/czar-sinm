@@ -86,12 +86,9 @@ class KeycloakAuth:
         self._token_url = f"{base}/{realm}/protocol/openid-connect/token"
 
         self._credentials = {
-            "grant_type": "password",
+            "grant_type": "client_credentials",
             "client_id": client_id,
-            "client_secret": client_secret,
-            "username": username,
-            "password": password,
-            "scope": "openid profile email",
+            "client_secret": client_secret
         }
         self._proxies = proxies
         self._access_token: Optional[str] = None
