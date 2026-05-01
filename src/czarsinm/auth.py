@@ -1,5 +1,5 @@
 """
-Autenticação via Keycloak (OAuth2 Resource Owner Password Credentials).
+Autenticação via Keycloak (OAuth2 Client Credentials).
 """
 
 from __future__ import annotations
@@ -34,40 +34,36 @@ class KeycloakAuth:
 
     def __init__(
         self,
-        username: str,
-        password: str,
         client_id: str,
         client_secret: str,
         ambiente: str = "hml",
         keycloak_url: Optional[str] = None,
         keycloak_realm: Optional[str] = None,
         proxies: Optional[dict] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
     ):
         """
         Parameters
         ----------
-        username:
-            Login do usuário no Keycloak.
-        password:
-            Senha do usuário.
         client_id:
-            Client ID fornecido pela equipe SINM.
+            CNPJ da empresa (Client ID no Keycloak).
         client_secret:
-            Client secret fornecido pela equipe SINM.
+            Client secret fornecido pela equipe SiNM.
         ambiente:
             'hml', 'prd' ou qualquer string para ambiente customizado.
             Em ambientes customizados, 'keycloak_url' e 'keycloak_realm'
             tornam-se obrigatórios.
         keycloak_url:
-            URL base do Keycloak incluindo o segmento /realms
-            (ex: 'https://meu-keycloak.exemplo.com/realms').
-            Obrigatório para ambientes customizados; se None, usa a URL padrão da Embrapa.
+            URL base do Keycloak incluindo o segmento /realms.
+            Obrigatório para ambientes customizados.
         keycloak_realm:
             Nome do realm no Keycloak.
-            Obrigatório para ambientes customizados; se None, usa o mapeamento
-            padrão (hml → zarcnm-h, prd → zarcnm).
+            Obrigatório para ambientes customizados.
         proxies:
             Dicionário de proxies requests (ex: {'https': 'http://proxy:3128'}).
+        username, password:
+            Ignorados (mantidos para compatibilidade com versões anteriores).
         """
         if ambiente not in REALMS and keycloak_url is None:
             raise ValueError(
@@ -86,18 +82,13 @@ class KeycloakAuth:
         self._token_url = f"{base}/{realm}/protocol/openid-connect/token"
 
         self._credentials = {
-            "grant_type": "password",
+            "grant_type": "client_credentials",
             "client_id": client_id,
             "client_secret": client_secret,
-            "username": username,
-            "password": password,
-            "scope": "openid profile email",
         }
         self._proxies = proxies
         self._access_token: Optional[str] = None
-        self._refresh_token: Optional[str] = None
         self._expires_at: float = 0.0
-        self._refresh_expires_at: float = 0.0
 
     # ------------------------------------------------------------------
     # Público
@@ -106,15 +97,9 @@ class KeycloakAuth:
     @property
     def token(self) -> str:
         """Retorna um access token válido, renovando se necessário."""
-        now = time.time()
-        if self._access_token and now < self._expires_at - 30:
+        if self._access_token and time.time() < self._expires_at - 30:
             return self._access_token
-
-        if self._refresh_token and now < self._refresh_expires_at - 30:
-            self._refresh()
-        else:
-            self._authenticate()
-
+        self._authenticate()
         return self._access_token  # type: ignore[return-value]
 
     @property
@@ -142,8 +127,8 @@ class KeycloakAuth:
     # ------------------------------------------------------------------
 
     def _authenticate(self) -> None:
-        """Obtém um novo par access_token / refresh_token."""
-        logger.info("Autenticando no Keycloak: %s", self._token_url)
+        logger.info("Autenticando no Keycloak (client_credentials): client=%s url=%s",
+                    self._credentials["client_id"], self._token_url)
         try:
             resp = requests.post(
                 self._token_url,
@@ -158,44 +143,14 @@ class KeycloakAuth:
             raise AuthenticationError(
                 f"Keycloak retornou HTTP {resp.status_code}: {resp.text}"
             )
-        logger.info("Usuário %s autenticado com sucesso no client %s", self._credentials["username"], self._credentials["client_id"])
-        self._parse_token_response(resp.json())
-
-    def _refresh(self) -> None:
-        """Renova o token usando o refresh_token."""
-        logger.debug("Renovando token via refresh_token")
-        data = {
-            "grant_type": "refresh_token",
-            "client_id": self._credentials["client_id"],
-            "client_secret": self._credentials["client_secret"],
-            "refresh_token": self._refresh_token,
-        }
-        try:
-            resp = requests.post(
-                self._token_url,
-                data=data,
-                timeout=15,
-                proxies=self._proxies,
-            )
-        except requests.RequestException as exc:
-            raise AuthenticationError(f"Falha ao renovar token: {exc}") from exc
-
-        if resp.status_code != 200:
-            # Refresh falhou — tenta autenticação completa
-            logger.warning("Refresh falhou (HTTP %s), reautenticando...", resp.status_code)
-            self._authenticate()
-            return
-
         self._parse_token_response(resp.json())
 
     def _parse_token_response(self, data: dict) -> None:
         now = time.time()
         self._access_token = data["access_token"]
-        self._refresh_token = data.get("refresh_token")
         self._expires_at = now + int(data.get("expires_in", 300))
-        self._refresh_expires_at = now + int(data.get("refresh_expires_in", 1800))
-        roles = self._decode_token_roles(self._access_token or "")
-        logger.info("Token obtido, válido por %ss — roles: %s", data.get("expires_in"), roles)
+        logger.info("Token obtido para client %s, válido por %ss",
+                    self._credentials["client_id"], data.get("expires_in"))
 
     @staticmethod
     def _jwt_payload(token: str) -> dict:
