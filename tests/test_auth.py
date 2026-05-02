@@ -25,13 +25,15 @@ def _make_token_response(roles=None, client_id="client-id", expires_in=300, refr
 
 
 def _make_auth(**kwargs) -> KeycloakAuth:
+    """Default: client_credentials. Para ROPC, passe grant_type='password'
+    com username/password."""
     defaults = dict(
-        username="user@test.br",
-        password="senha",
         client_id="client-id",
         client_secret="client-secret",
         ambiente="hml",
     )
+    if kwargs.get("grant_type") == "password":
+        defaults.update(username="user@test.br", password="senha")
     defaults.update(kwargs)
     return KeycloakAuth(**defaults)
 
@@ -98,10 +100,31 @@ class TestInit:
         auth = _make_auth(keycloak_url="http://keycloak.local/realms")
         assert auth._token_url.startswith("http://keycloak.local/realms")
 
-    def test_credenciais_armazenadas(self):
+    def test_credenciais_default_client_credentials(self):
         auth = _make_auth()
-        assert auth._credentials["username"] == "user@test.br"
+        assert auth._credentials["grant_type"] == "client_credentials"
+        assert auth._credentials["client_id"] == "client-id"
+        assert "username" not in auth._credentials
+        assert "password" not in auth._credentials
+
+    def test_credenciais_password_grant(self):
+        auth = _make_auth(grant_type="password")
         assert auth._credentials["grant_type"] == "password"
+        assert auth._credentials["username"] == "user@test.br"
+        assert auth._credentials["password"] == "senha"
+
+    def test_password_grant_sem_credenciais_falha(self):
+        with pytest.raises(ValueError, match="username"):
+            KeycloakAuth(
+                client_id="client-id",
+                client_secret="client-secret",
+                ambiente="hml",
+                grant_type="password",
+            )
+
+    def test_grant_type_invalido_falha(self):
+        with pytest.raises(ValueError, match="não suportado"):
+            _make_auth(grant_type="implicit")
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +144,6 @@ class TestAuthenticate:
 
         mock_post.assert_called_once()
         assert auth._access_token == token_resp["access_token"]
-        assert auth._refresh_token == "refresh-token-fake"
         assert auth._expires_at > time.time()
 
     def test_falha_http_levanta_authentication_error(self):
@@ -150,13 +172,11 @@ class TestParseTokenResponse:
     def test_seta_token_e_expiracao(self):
         auth = _make_auth()
         now = time.time()
-        data = _make_token_response(expires_in=300, refresh_expires_in=1800)
+        data = _make_token_response(expires_in=300)
         auth._parse_token_response(data)
 
         assert auth._access_token == data["access_token"]
-        assert auth._refresh_token == "refresh-token-fake"
         assert auth._expires_at >= now + 299
-        assert auth._refresh_expires_at >= now + 1799
 
 
 # ---------------------------------------------------------------------------
@@ -182,17 +202,15 @@ class TestTokenProperty:
             tok = auth.token
             assert tok == token_data["access_token"]
 
-    def test_usa_refresh_quando_disponivel(self):
+    def test_reautentica_quando_token_expirado(self):
         auth = _make_auth()
         token_data = _make_token_response()
-        auth._access_token = None
-        auth._expires_at = 0
-        auth._refresh_token = "valid-refresh"
-        auth._refresh_expires_at = time.time() + 600
+        auth._access_token = "expirado"
+        auth._expires_at = time.time() - 1
 
-        with patch.object(auth, "_refresh", side_effect=lambda: auth._parse_token_response(token_data)) as mock_ref:
+        with patch.object(auth, "_authenticate", side_effect=lambda: auth._parse_token_response(token_data)) as mock_auth:
             _ = auth.token
-            mock_ref.assert_called_once()
+            mock_auth.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
