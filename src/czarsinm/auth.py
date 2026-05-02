@@ -42,6 +42,7 @@ class KeycloakAuth:
         proxies: Optional[dict] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        grant_type: Optional[str] = None,
     ):
         """
         Parameters
@@ -63,7 +64,12 @@ class KeycloakAuth:
         proxies:
             Dicionário de proxies requests (ex: {'https': 'http://proxy:3128'}).
         username, password:
-            Ignorados (mantidos para compatibilidade com versões anteriores).
+            Usados apenas quando grant_type='password' (ROPC). Ignorados em
+            client_credentials (default).
+        grant_type:
+            Opcional. Default 'client_credentials'. Use 'password' para ROPC
+            (precisa username + password). Mantido como último parâmetro para
+            preservar compatibilidade com chamadas posicionais existentes.
         """
         if ambiente not in REALMS and keycloak_url is None:
             raise ValueError(
@@ -81,11 +87,31 @@ class KeycloakAuth:
         base = (keycloak_url or KEYCLOAK_BASE).rstrip("/")
         self._token_url = f"{base}/{realm}/protocol/openid-connect/token"
 
-        self._credentials = {
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-        }
+        effective_grant = grant_type or "client_credentials"
+        if effective_grant == "password":
+            if not username or not password:
+                raise ValueError(
+                    "grant_type='password' requer username e password."
+                )
+            self._credentials = {
+                "grant_type": "password",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "username": username,
+                "password": password,
+            }
+        elif effective_grant == "client_credentials":
+            self._credentials = {
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }
+        else:
+            raise ValueError(
+                f"grant_type '{effective_grant}' não suportado. "
+                "Use 'client_credentials' (default) ou 'password'."
+            )
+        self._grant_type = effective_grant
         self._proxies = proxies
         self._access_token: Optional[str] = None
         self._expires_at: float = 0.0
@@ -127,8 +153,8 @@ class KeycloakAuth:
     # ------------------------------------------------------------------
 
     def _authenticate(self) -> None:
-        logger.info("Autenticando no Keycloak (client_credentials): client=%s url=%s",
-                    self._credentials["client_id"], self._token_url)
+        logger.info("Autenticando no Keycloak (%s): client=%s url=%s",
+                    self._grant_type, self._credentials["client_id"], self._token_url)
         try:
             resp = requests.post(
                 self._token_url,
