@@ -1,85 +1,57 @@
 # Como fazer uma release
 
-O pipeline de release é acionado automaticamente ao publicar uma tag `v*` no GitHub. Ele roda testes unitários e de integração antes de criar a release e publicar no PyPI — se qualquer etapa falhar, nada é publicado.
+Todo o processo de release é executado por um único workflow do GitHub Actions, disparado manualmente. O workflow faz, em ordem:
+
+1. valida o formato da versão e que a tag ainda não existe;
+2. roda os testes unitários e de integração;
+3. atualiza `pyproject.toml` e `CHANGELOG.md` direto em `main`;
+4. cria a tag `vX.Y.Z` e a publica no GitHub;
+5. cria a release no GitHub;
+6. publica no PyPI via Trusted Publisher (OIDC).
+
+Se qualquer etapa falhar, **nada** é commitado, tagueado ou publicado.
 
 ## Passo a passo
 
-### 1. Atualize a versão
+1. Garanta que `develop` foi mergeada em `main` pelo fluxo normal de PR.
+2. No GitHub, vá em **Actions → Release → Run workflow**.
+3. Em "Nova versão", informe a versão sem o prefixo `v` (ex: `0.3.0`, `0.3.0-rc1`), seguindo [Versionamento Semântico](https://semver.org/lang/pt-BR/):
 
-Em [`pyproject.toml`](pyproject.toml), incremente o campo `version` seguindo [Versionamento Semântico](https://semver.org/lang/pt-BR/):
+   | Tipo de mudança | O que incrementar | Exemplo |
+   |---|---|---|
+   | Correção de bug compatível | patch | `0.2.1` → `0.2.2` |
+   | Nova funcionalidade compatível | minor | `0.2.1` → `0.3.0` |
+   | Quebra de compatibilidade | major | `0.2.1` → `1.0.0` |
 
-```toml
-[project]
-version = "0.2.0"
-```
+4. Clique em **Run workflow** e acompanhe o pipeline. O fluxo é:
 
-| Tipo de mudança | O que incrementar | Exemplo |
-|---|---|---|
-| Correção de bug compatível | patch | `0.1.2` → `0.1.3` |
-| Nova funcionalidade compatível | minor | `0.1.2` → `0.2.0` |
-| Quebra de compatibilidade | major | `0.1.2` → `1.0.0` |
+   ```
+   validate ─┬─► unit ────────┐
+             └─► integration ─┴─► bump ─► release ─► pypi
+   ```
 
-### 2. Atualize o CHANGELOG
+5. Ao final, o pacote estará disponível em `pip install czar-sinm==X.Y.Z`.
 
-Em [`CHANGELOG.md`](CHANGELOG.md), mova o conteúdo de `[Não lançado]` para uma nova seção com a versão e data:
-
-```markdown
-## [0.2.0] — 2026-04-16
-
-### Alterado
-- `Indice`: campo `coordenada` (WKT) substituído por `longitude` e `latitude` separados,
-  alinhando com a nova interface do zarc-nm.
-```
-
-### 3. Commit, merge e tag
-
-Faça o bump em `develop` e leve ao `main` pelo fluxo normal:
-
-```bash
-# em develop
-git add pyproject.toml CHANGELOG.md
-git commit -m "bump version to 0.2.0"
-git push origin develop
-```
-
-Abra um PR de `develop` → `main`, aguarde os testes de CI passarem e faça o merge. Depois:
-
-```bash
-git checkout main && git pull
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-> A tag deve ter o prefixo `v` (ex: `v0.2.0`) — é isso que aciona o workflow `.github/workflows/release.yml`.
-
-### 4. Acompanhe o pipeline
-
-Acesse **Actions → Release** no GitHub. O pipeline executa em sequência:
-
-```
-Testes unitários ──┐
-                   ├──► Criar release no GitHub ──► Publicar no PyPI
-Testes integração ─┘
-```
-
-Se os testes de integração falharem, a release **não** é criada e o PyPI **não** é atualizado.
+> O workflow também faz o bump no `CHANGELOG.md`, inserindo `## [X.Y.Z] — YYYY-MM-DD` logo abaixo de `## [Não lançado]`. Mantenha a seção `[Não lançado]` populada com as mudanças desde a última release antes de disparar o workflow.
 
 ---
 
-## Publicação no PyPI (configuração única)
+## Configuração inicial (uma vez só)
 
-O pacote é publicado via **Trusted Publisher** (OIDC) — sem API token armazenado. Configuração necessária apenas uma vez:
+### Trusted Publisher no PyPI
 
-1. Acesse [pypi.org](https://pypi.org) → sua conta → **Publishing**
+O pacote é publicado via **Trusted Publisher** (OIDC) — sem API token armazenado.
+
+1. [pypi.org](https://pypi.org) → sua conta → **Publishing**
 2. Adicione um trusted publisher com:
    - **Owner:** `CoutureTec`
    - **Repository:** `czar-sinm`
    - **Workflow:** `release.yml`
    - **Environment:** `pypi`
 
-## Secrets necessários para integração
+### Secrets para os testes de integração
 
-Configure em **Settings → Secrets and variables → Actions**:
+Em **Settings → Secrets and variables → Actions**:
 
 | Secret | Descrição |
 |---|---|
@@ -87,3 +59,10 @@ Configure em **Settings → Secrets and variables → Actions**:
 | `SINM_PASSWORD` | Senha de homologação |
 | `SINM_CLIENT_ID` | Client ID do Keycloak |
 | `SINM_CLIENT_SECRET` | Client Secret do Keycloak |
+
+### Permissão de push em `main`
+
+O job `bump` usa o `GITHUB_TOKEN` para empurrar o commit de bump e a tag em `main`. Se a branch `main` tiver regra de proteção exigindo PR/review, o token padrão será bloqueado. Soluções:
+
+- adicionar `github-actions[bot]` à allowlist de "bypass" da regra; **ou**
+- criar um PAT (fine-grained, escopo `Contents: write` no repositório), salvar como secret `RELEASE_PAT` e trocar `token: ${{ secrets.GITHUB_TOKEN }}` por `token: ${{ secrets.RELEASE_PAT }}` no workflow.
