@@ -16,6 +16,11 @@ Se qualquer etapa falhar, **nada** é commitado, tagueado ou publicado.
 1. Garanta que `develop` foi mergeada em `main` pelo fluxo normal de PR.
 2. No GitHub, vá em **Actions → Release → Run workflow**.
 3. Em "Nova versão", informe a versão sem o prefixo `v` (ex: `0.3.0`, `0.3.0-rc1`), seguindo [Versionamento Semântico](https://semver.org/lang/pt-BR/):
+```bash
+git checkout main && git pull origin main
+git tag v0.2.0
+git push origin v0.2.0
+```
 
    | Tipo de mudança | O que incrementar | Exemplo |
    |---|---|---|

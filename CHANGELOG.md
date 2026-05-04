@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [0.2.1] — 2025-04-01
+
 ### Adicionado
 - Exemplos de uso com dados auto-contidos (`exemplos/01_dados_auto_contidos/`)
 - Exemplos de uso com dados em arquivos CSV (`exemplos/dados_externos/`)
@@ -20,6 +22,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Alterado
 - `Indice`: campo `coordenada` (string WKT) substituído por `longitude: float` e `latitude: float` separados, alinhando com a nova interface do zarc-nm
+- Autorização entre clients (empresas) e não entre usuários e clients.
 - Autenticação default migrada de ROPC (`grant_type=password`) para Client
   Credentials (`grant_type=client_credentials`). Motivo: o backend zarc-nm
   passou a autorizar por empresa (client) usando service-account roles, fluxo
@@ -27,6 +30,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   no construtor permanecem (não quebra código existente), mas são ignorados
   no default. Para manter o comportamento antigo (ex.: integrações com auth
   por usuário humano), passe `grant_type='password'` explicitamente.
+
 
 ---
 
