@@ -90,6 +90,7 @@ jobs:
         run: |
           cat > exemplos/01_dados_auto_contidos/.env <<EOF
           SINM_AMBIENTE=hml
+          SINM_GRANT_TYPE=password
           SINM_USERNAME=${{ secrets.SINM_USERNAME }}
           SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
           SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}
@@ -100,6 +101,7 @@ jobs:
         run: |
           cat > exemplos/02_dados_externos/.env <<EOF
           SINM_AMBIENTE=hml
+          SINM_GRANT_TYPE=password
           SINM_USERNAME=${{ secrets.SINM_USERNAME }}
           SINM_PASSWORD=${{ secrets.SINM_PASSWORD }}
           SINM_CLIENT_ID=${{ secrets.SINM_CLIENT_ID }}

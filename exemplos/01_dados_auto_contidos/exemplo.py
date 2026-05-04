@@ -103,6 +103,7 @@ AMBIENTE       = os.getenv("SINM_AMBIENTE", "hml")
 BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
 KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
 KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
+GRANT_TYPE     = os.getenv("SINM_GRANT_TYPE") or None
 
 # --------------------------------------------------------------------------
 # Client
@@ -116,6 +117,7 @@ client = SINMClient(
     base_url=BACKEND_URL,
     keycloak_url=KEYCLOAK_URL,
     keycloak_realm=KEYCLOAK_REALM,
+    grant_type=GRANT_TYPE,
 )
 
 # --------------------------------------------------------------------------
