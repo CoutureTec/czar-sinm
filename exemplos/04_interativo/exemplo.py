@@ -114,6 +114,7 @@ def _carregar_ou_pedir_credenciais():
     backend_url    = os.getenv("SINM_BACKEND_URL", "").strip() or None
     keycloak_url   = os.getenv("SINM_KEYCLOAK", "").strip() or None
     keycloak_realm = os.getenv("SINM_KEYCLOAK_REALM", "").strip() or None
+    grant_type     = os.getenv("SINM_GRANT_TYPE", "").strip() or None
 
     if digitadas_pelo_usuario and ambiente not in ("hml", "prd"):
         print()
@@ -128,7 +129,7 @@ def _carregar_ou_pedir_credenciais():
     return (
         usuario, senha, client_id, client_secret,
         ambiente, backend_url, keycloak_url, keycloak_realm,
-        digitadas_pelo_usuario,
+        grant_type, digitadas_pelo_usuario,
     )
 
 
@@ -162,7 +163,7 @@ def _salvar_env(usuario, senha, client_id, client_secret,
 (
     USUARIO, SENHA, CLIENT_ID, CLIENT_SECRET,
     AMBIENTE, BACKEND_URL, KEYCLOAK_URL, KEYCLOAK_REALM,
-    _credenciais_manuais,
+    GRANT_TYPE, _credenciais_manuais,
 ) = _carregar_ou_pedir_credenciais()
 
 print()
@@ -182,6 +183,7 @@ client = SINMClient(
     base_url=BACKEND_URL,
     keycloak_url=KEYCLOAK_URL,
     keycloak_realm=KEYCLOAK_REALM,
+    grant_type=GRANT_TYPE,
 )
 
 print("  Autenticado com sucesso!")

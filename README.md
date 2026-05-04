@@ -107,9 +107,11 @@ para detalhes sobre todas as opções do menu.
 from czarsinm import SINMClient
 from czarsinm.exceptions import PermissaoError, APIError
 
+# Default: autenticação por Client Credentials (M2M).
+# username/password são aceitos no construtor mas ignorados neste fluxo.
 client = SINMClient(
-    username="usuario@exemplo.com",
-    password="senha",
+    username="usuario@exemplo.com",  # ignorado em client_credentials
+    password="senha",                # ignorado em client_credentials
     client_id="meu-client-id",
     client_secret="meu-client-secret",
     ambiente="hml",
@@ -127,6 +129,34 @@ except PermissaoError as e:
 except APIError as e:
     print(e.format_report())
 ```
+
+#### Fluxo de autenticação
+
+Desde a versão 0.3.x, o **default** é OAuth2 **Client Credentials** —
+o backend zarc-nm autoriza por empresa (client) usando service-account roles,
+e esse modelo só funciona com Client Credentials.
+
+Para manter o fluxo antigo (ROPC, autenticação por usuário humano), passe
+`grant_type="password"` explicitamente:
+
+```python
+client = SINMClient(
+    username="usuario@exemplo.com",
+    password="senha",
+    client_id="meu-client-id",
+    client_secret="meu-client-secret",
+    ambiente="hml",
+    grant_type="password",   # opcional, default é "client_credentials"
+)
+```
+
+| Modo | Quando usar | O que precisa |
+|------|-------------|---------------|
+| `client_credentials` (default) | Integração M2M; backend usa SA roles cross-empresa | `client_id` + `client_secret` |
+| `password` (ROPC) | Usuário humano com role direta atribuída no Keycloak | `username` + `password` + `client_id` + `client_secret` |
+
+`grant_type` é o último parâmetro do construtor (posicional ou por nome) —
+isso preserva compatibilidade com qualquer chamada existente.
 
 Para exemplos completos com cadastro de gleba, análise de solo e sensoriamento remoto → [exemplos/README.md](exemplos/README.md)
 

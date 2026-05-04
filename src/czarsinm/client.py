@@ -82,6 +82,7 @@ class SINMClient:
         keycloak_realm: Optional[str] = None,
         proxies: Optional[dict] = None,
         timeout: int = 60,
+        grant_type: Optional[str] = None,
     ):
         """
         Parameters
@@ -122,14 +123,15 @@ class SINMClient:
                 "(ou defina SINM_BACKEND_URL no arquivo .env)."
             )
         self._auth = KeycloakAuth(
-            username=username,
-            password=password,
             client_id=client_id,
             client_secret=client_secret,
             ambiente=ambiente,
             keycloak_url=keycloak_url,
             keycloak_realm=keycloak_realm,
             proxies=proxies,
+            username=username,
+            password=password,
+            grant_type=grant_type,
         )
         self._base_url = (base_url or API_URLS.get(ambiente, API_URLS["hml"])).rstrip("/")
         self._proxies = proxies

@@ -15,10 +15,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Suíte de testes unitários (`tests/`)
 - Workflow de CI com GitHub Actions (`.github/workflows/ci.yml`)
 - `CONTRIBUTING.md` com guia de contribuição
+- Parâmetro opcional `grant_type` em `SINMClient` e `KeycloakAuth`. Default
+  permanece `'client_credentials'` (compatibilidade com chamadas existentes).
+  Passar `grant_type='password'` ativa o fluxo ROPC (`username` + `password`
+  obrigatórios).
 
 ### Alterado
 - `Indice`: campo `coordenada` (string WKT) substituído por `longitude: float` e `latitude: float` separados, alinhando com a nova interface do zarc-nm
 - Autorização entre clients (empresas) e não entre usuários e clients.
+- Autenticação default migrada de ROPC (`grant_type=password`) para Client
+  Credentials (`grant_type=client_credentials`). Motivo: o backend zarc-nm
+  passou a autorizar por empresa (client) usando service-account roles, fluxo
+  que só funciona com Client Credentials. Os parâmetros `username`/`password`
+  no construtor permanecem (não quebra código existente), mas são ignorados
+  no default. Para manter o comportamento antigo (ex.: integrações com auth
+  por usuário humano), passe `grant_type='password'` explicitamente.
+
 
 ---
 
