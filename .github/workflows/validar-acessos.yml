@@ -16,43 +16,30 @@ on:
         options:
           - hml
           - prd
-          - custom
       sinm_username:
-        description: 'Usuário (SINM_USERNAME)'
+        description: 'Usuário (email)'
         required: true
         type: string
       sinm_password:
-        description: 'Senha (SINM_PASSWORD)'
+        description: 'Senha (senha é mascarada nos logs)'
         required: true
         type: string
       sinm_client_id:
-        description: 'Client ID Keycloak (SINM_CLIENT_ID)'
+        description: 'Client ID Keycloak (CNPJ sem máscara, ex: 41483879000157)'
         required: true
         type: string
       sinm_client_secret:
-        description: 'Client Secret Keycloak (SINM_CLIENT_SECRET)'
+        description: 'Client Secret Keycloak (Chave secreta do client)'
         required: true
         type: string
       sinm_grant_type:
-        description: 'Grant Type'
+        description: 'Grant Type (opcional, padrão=password)'
         required: false
         default: 'password'
         type: choice
         options:
           - password
           - client_credentials
-      sinm_backend_url:
-        description: 'Backend URL — obrigatório se ambiente=custom (ex: https://api.exemplo.com)'
-        required: false
-        type: string
-      sinm_keycloak:
-        description: 'Keycloak URL com /realms — obrigatório se ambiente=custom'
-        required: false
-        type: string
-      sinm_keycloak_realm:
-        description: 'Keycloak Realm — obrigatório se ambiente=custom'
-        required: false
-        type: string
       endpoint:
         description: 'Endpoint para teste GET autenticado (opcional, ex: /api/v1/glebas)'
         required: false
