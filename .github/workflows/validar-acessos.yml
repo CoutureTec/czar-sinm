@@ -1,0 +1,100 @@
+name: Validar Acessos (Exemplo 03)
+
+# Executa exemplos/03_validar_acessos/exemplo.py com as credenciais
+# informadas via formulário. Senha e client_secret são mascarados nos logs.
+#
+# Disparo: Actions → "Validar Acessos (Exemplo 03)" → Run workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      sinm_ambiente:
+        description: 'Ambiente'
+        required: true
+        default: 'hml'
+        type: choice
+        options:
+          - hml
+          - prd
+          - custom
+      sinm_username:
+        description: 'Usuário (SINM_USERNAME)'
+        required: true
+        type: string
+      sinm_password:
+        description: 'Senha (SINM_PASSWORD)'
+        required: true
+        type: string
+      sinm_client_id:
+        description: 'Client ID Keycloak (SINM_CLIENT_ID)'
+        required: true
+        type: string
+      sinm_client_secret:
+        description: 'Client Secret Keycloak (SINM_CLIENT_SECRET)'
+        required: true
+        type: string
+      sinm_grant_type:
+        description: 'Grant Type'
+        required: false
+        default: 'password'
+        type: choice
+        options:
+          - password
+          - client_credentials
+      sinm_backend_url:
+        description: 'Backend URL — obrigatório se ambiente=custom (ex: https://api.exemplo.com)'
+        required: false
+        type: string
+      sinm_keycloak:
+        description: 'Keycloak URL com /realms — obrigatório se ambiente=custom'
+        required: false
+        type: string
+      sinm_keycloak_realm:
+        description: 'Keycloak Realm — obrigatório se ambiente=custom'
+        required: false
+        type: string
+      endpoint:
+        description: 'Endpoint para teste GET autenticado (opcional, ex: /api/v1/glebas)'
+        required: false
+        type: string
+
+jobs:
+  validar-acessos:
+    name: Validar Acessos
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mascarar dados sensíveis
+        run: |
+          echo "::add-mask::${{ inputs.sinm_password }}"
+          echo "::add-mask::${{ inputs.sinm_client_secret }}"
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -e ".[dev]"
+
+      - name: Executar Validação de Acessos
+        working-directory: exemplos/03_validar_acessos
+        env:
+          SINM_AMBIENTE: ${{ inputs.sinm_ambiente }}
+          SINM_USERNAME: ${{ inputs.sinm_username }}
+          SINM_PASSWORD: ${{ inputs.sinm_password }}
+          SINM_CLIENT_ID: ${{ inputs.sinm_client_id }}
+          SINM_CLIENT_SECRET: ${{ inputs.sinm_client_secret }}
+          SINM_GRANT_TYPE: ${{ inputs.sinm_grant_type }}
+          SINM_BACKEND_URL: ${{ inputs.sinm_backend_url }}
+          SINM_KEYCLOAK: ${{ inputs.sinm_keycloak }}
+          SINM_KEYCLOAK_REALM: ${{ inputs.sinm_keycloak_realm }}
+          SINM_ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          if [ -n "$SINM_ENDPOINT" ]; then
+            python exemplo.py --endpoint "$SINM_ENDPOINT"
+          else
+            python exemplo.py
+          fi
