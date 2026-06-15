@@ -45,6 +45,22 @@ def _roles_para_endpoint(path: str) -> list:
     return []
 
 
+def _extrair_lista(response) -> list:
+    """Extrai a lista de items de uma resposta da API.
+
+    Aceita dois formatos:
+    - Lista simples: retorna diretamente.
+    - Spring HATEOAS PagedModel: extrai o primeiro valor de ``_embedded``.
+    """
+    if isinstance(response, list):
+        return response
+    if isinstance(response, dict) and "_embedded" in response:
+        embedded = response["_embedded"]
+        if isinstance(embedded, dict):
+            return next(iter(embedded.values()), [])
+    return response
+
+
 class SINMClient:
     """
     Cliente para a API SiNM (Sistema de Informações de Níveis de Manejo) (SiNM).
@@ -180,7 +196,7 @@ class SINMClient:
 
     def listar_glebas(self) -> list:
         """Lista as glebas do usuário autenticado."""
-        return self._get("/api/v1/glebas")
+        return _extrair_lista(self._get("/api/v1/glebas"))
 
     # ------------------------------------------------------------------
     # Análise de Solo
@@ -220,7 +236,7 @@ class SINMClient:
 
     def listar_analises_solo(self) -> list:
         """Lista as análises de solo do usuário autenticado."""
-        return self._get("/api/v1/analises-solo")
+        return _extrair_lista(self._get("/api/v1/analises-solo"))
 
     # ------------------------------------------------------------------
     # Sensoriamento Remoto
@@ -258,7 +274,7 @@ class SINMClient:
 
     def listar_sensoriamentos_remotos(self) -> list:
         """Lista os sensoriamentos do usuário autenticado."""
-        return self._get("/api/v1/sensoriamentos-remotos")
+        return _extrair_lista(self._get("/api/v1/sensoriamentos-remotos"))
 
     # ------------------------------------------------------------------
     # Operação (fluxo combinado por UUIDs)
@@ -312,7 +328,7 @@ class SINMClient:
 
     def listar_classificacoes(self) -> list:
         """Lista todas as classificações do usuário autenticado."""
-        return self._get("/api/v1/classificacoes")
+        return _extrair_lista(self._get("/api/v1/classificacoes"))
 
     # ------------------------------------------------------------------
     # HTTP helpers
