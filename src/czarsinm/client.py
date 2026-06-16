@@ -51,13 +51,20 @@ def _extrair_lista(response) -> list:
     Aceita dois formatos:
     - Lista simples: retorna diretamente.
     - Spring HATEOAS PagedModel: extrai o primeiro valor de ``_embedded``.
+
+    Quando o PagedModel está vazio o Spring HATEOAS omite o ``_embedded``
+    (sobram apenas ``_links``/``page``); nesse caso a lista correta é ``[]``,
+    não o dict cru — daí a checagem explícita de resposta HATEOAS.
     """
     if isinstance(response, list):
         return response
-    if isinstance(response, dict) and "_embedded" in response:
-        embedded = response["_embedded"]
+    if isinstance(response, dict):
+        embedded = response.get("_embedded")
         if isinstance(embedded, dict):
             return next(iter(embedded.values()), [])
+        # PagedModel/HAL vazio não traz _embedded → lista vazia
+        if "page" in response or "_links" in response:
+            return []
     return response
 
 
