@@ -205,8 +205,8 @@ class TestAnaliseSolo:
     def test_to_dict_com_cpf_e_cnpj(self, analise_solo):
         d = analise_solo.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpjPropriedade"] == "54194116000138"
-        assert "cnpj" not in d
+        assert d["cnpj"] == "54194116000138"
+        assert "cnpjPropriedade" not in d
         assert isinstance(d["amostrasQuimicas"], list)
         assert len(d["amostrasQuimicas"]) == 1
         assert "amostrasFisicas" not in d
@@ -256,8 +256,8 @@ class TestSensoriamentoRemoto:
     def test_to_dict_campos_opcionais_presentes(self, sensoriamento_remoto):
         d = sensoriamento_remoto.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpjPropriedade"] == "54194116000138"
-        assert "cnpj" not in d
+        assert d["cnpj"] == "54194116000138"
+        assert "cnpjPropriedade" not in d
         assert d["codigoSatelitePlantioContorno"] == "S08"
         assert d["codigoSateliteTerraceamento"] == "S07"
 

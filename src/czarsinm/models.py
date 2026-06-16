@@ -349,7 +349,9 @@ class AnaliseSolo:
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
         if self.cnpjPropriedade:
-            d["cnpjPropriedade"] = self.cnpjPropriedade
+            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
+            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
+            d["cnpj"] = self.cnpjPropriedade
         if self.cnpjLaboratorio:
             d["cnpjLaboratorio"] = self.cnpjLaboratorio
         return d
@@ -468,7 +470,9 @@ class SensoriamentoRemoto:
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
         if self.cnpjPropriedade:
-            d["cnpjPropriedade"] = self.cnpjPropriedade
+            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
+            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
+            d["cnpj"] = self.cnpjPropriedade
         if self.cnpjEmpresaSensoriamento:
             d["cnpjEmpresaSensoriamento"] = self.cnpjEmpresaSensoriamento
         if self.codigoSatelitePlantioContorno:
