@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [0.3.0.rc2] — 2026-06-16
+
 ## [0.3.0.rc1] — 2026-06-16
 
 ## [0.2.1] — 2025-04-01
