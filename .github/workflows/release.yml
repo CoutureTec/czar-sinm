@@ -144,9 +144,10 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          # GITHUB_TOKEN basta se a branch main NÃO tiver proteção exigindo PR.
-          # Se tiver, troque por um PAT salvo como secret RELEASE_PAT.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # main é branch protegida (exige PR), então o GITHUB_TOKEN é rejeitado
+          # no push. Usamos um PAT (RELEASE_PAT) de um usuário autorizado a
+          # bypassar a proteção. Ver README/CONTRIBUTING para gerar o token.
+          token: ${{ secrets.RELEASE_PAT }}
 
       - name: Atualizar pyproject.toml
         env:
