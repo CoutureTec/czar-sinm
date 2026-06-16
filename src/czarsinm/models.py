@@ -365,7 +365,10 @@ class AnaliseSolo:
 class Indice:
     """Índice de vegetação de satélite."""
     codigoSatelite: str
-    """Código do satélite. Ex: 'S01'."""
+    """Código do satélite. Ex: 'S01'. Valores conhecidos: 'S01'–'S09' (ver GET /api/v1/satelites).
+    Um código desconhecido é aceito e o envio é persistido, mas a API registra uma inconsistência
+    ("Código de satélite inválido") e marca o satélite de origem como "Não identificado".
+    Não enviar 'S00' (sentinela interno; tratado como inválido)."""
     longitude: float
     """Longitude do ponto de observação."""
     latitude: float
@@ -437,7 +440,9 @@ class SensoriamentoRemoto:
     terraceamento: int
     """Terraceamento detectado: 0 ou 1."""
     codigoSateliteDeclividadeMedia: str
-    """Código do satélite usado para declividade. Ex: 'S09'."""
+    """Código do satélite usado para declividade. Ex: 'S09'. Valores conhecidos: 'S01'–'S09'
+    (ver GET /api/v1/satelites). Código desconhecido é aceito, mas gera inconsistência na API
+    (vide `Indice.codigoSatelite`). Não enviar 'S00'."""
     indices: list[Indice]
     """Mínimo 1 índice obrigatório."""
     cpfProdutor: Optional[str] = None
