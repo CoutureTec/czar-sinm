@@ -4,10 +4,39 @@ import pytest
 import responses as rsps_lib
 
 from czarsinm import SINMClient
-from czarsinm.client import API_URLS, _roles_para_endpoint
+from czarsinm.client import API_URLS, _extrair_lista, _roles_para_endpoint
 from czarsinm.exceptions import APIError, NotFoundError, PermissaoError, ValidationError
 
 BASE = API_URLS["hml"]
+
+
+# ---------------------------------------------------------------------------
+# _extrair_lista
+# ---------------------------------------------------------------------------
+
+class TestExtrairLista:
+    def test_lista_direta(self):
+        assert _extrair_lista([1, 2, 3]) == [1, 2, 3]
+
+    def test_lista_vazia(self):
+        assert _extrair_lista([]) == []
+
+    def test_hateoas_paged_model(self):
+        resp = {
+            "_embedded": {"glebaListagemModelList": [{"uuid": "a"}, {"uuid": "b"}]},
+            "_links": {},
+            "page": {"size": 20, "totalElements": 2},
+        }
+        result = _extrair_lista(resp)
+        assert result == [{"uuid": "a"}, {"uuid": "b"}]
+
+    def test_hateoas_embedded_vazio(self):
+        resp = {"_embedded": {}, "_links": {}, "page": {}}
+        assert _extrair_lista(resp) == []
+
+    def test_dict_sem_embedded_retorna_dict(self):
+        resp = {"uuid": "x"}
+        assert _extrair_lista(resp) == {"uuid": "x"}
 
 
 # ---------------------------------------------------------------------------
@@ -91,10 +120,21 @@ class TestCadastrarGleba:
         assert result["uuid"] == "uuid-1"
 
     @rsps_lib.activate
-    def test_listar_glebas(self, client):
+    def test_listar_glebas_lista_simples(self, client):
         rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", json=[{"uuid": "a"}, {"uuid": "b"}], status=200)
         result = client.listar_glebas()
         assert len(result) == 2
+
+    @rsps_lib.activate
+    def test_listar_glebas_paged_model(self, client):
+        paged = {
+            "_embedded": {"glebaListagemModelList": [{"uuid": "a"}, {"uuid": "b"}]},
+            "_links": {},
+            "page": {"size": 20, "totalElements": 2, "totalPages": 1, "number": 0},
+        }
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", json=paged, status=200)
+        result = client.listar_glebas()
+        assert result == [{"uuid": "a"}, {"uuid": "b"}]
 
 
 # ---------------------------------------------------------------------------

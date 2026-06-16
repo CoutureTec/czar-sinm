@@ -53,9 +53,15 @@ class TestRemoveNone:
 # ---------------------------------------------------------------------------
 
 class TestProdutor:
-    def test_to_dict(self, produtor):
+    def test_to_dict_com_nome(self, produtor):
         d = produtor.to_dict()
-        assert d == {"nome": "Produtor Teste", "cpf": "68122528082"}
+        assert d == {"cpf": "68122528082", "nome": "Produtor Teste"}
+
+    def test_to_dict_sem_nome(self):
+        p = Produtor(cpf="68122528082")
+        d = p.to_dict()
+        assert d == {"cpf": "68122528082"}
+        assert "nome" not in d
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +206,7 @@ class TestAnaliseSolo:
         d = analise_solo.to_dict()
         assert d["cpfProdutor"] == "68122528082"
         assert d["cnpj"] == "54194116000138"
+        assert "cnpjPropriedade" not in d
         assert isinstance(d["amostrasQuimicas"], list)
         assert len(d["amostrasQuimicas"]) == 1
         assert "amostrasFisicas" not in d
@@ -208,6 +215,7 @@ class TestAnaliseSolo:
         a = AnaliseSolo(amostrasQuimicas=[amostra])
         d = a.to_dict()
         assert "cpfProdutor" not in d
+        assert "cnpjPropriedade" not in d
         assert "cnpj" not in d
 
 
@@ -249,8 +257,23 @@ class TestSensoriamentoRemoto:
         d = sensoriamento_remoto.to_dict()
         assert d["cpfProdutor"] == "68122528082"
         assert d["cnpj"] == "54194116000138"
+        assert "cnpjPropriedade" not in d
         assert d["codigoSatelitePlantioContorno"] == "S08"
         assert d["codigoSateliteTerraceamento"] == "S07"
+
+    def test_to_dict_cnpj_empresa_sensoriamento(self):
+        sr = SensoriamentoRemoto(
+            dataInicial="2021-01-01",
+            dataFinal="2024-01-01",
+            declividadeMedia=30,
+            plantioContorno=0,
+            terraceamento=0,
+            codigoSateliteDeclividadeMedia="S09",
+            cnpjEmpresaSensoriamento="12345678000195",
+            indices=[Indice("S01", -47.1, -22.8, "2021-01-17", 0.5, 0.3)],
+        )
+        d = sr.to_dict()
+        assert d["cnpjEmpresaSensoriamento"] == "12345678000195"
 
     def test_to_dict_sem_opcionais(self):
         sr = SensoriamentoRemoto(
@@ -273,7 +296,9 @@ class TestSensoriamentoRemoto:
         )
         d = sr.to_dict()
         assert "cpfProdutor" not in d
+        assert "cnpjPropriedade" not in d
         assert "cnpj" not in d
+        assert "cnpjEmpresaSensoriamento" not in d
         assert "codigoSatelitePlantioContorno" not in d
         assert "codigoSateliteTerraceamento" not in d
 

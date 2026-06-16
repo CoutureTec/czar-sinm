@@ -190,7 +190,7 @@ def _dado_gleba() -> DadoGleba:
 def _analise_solo() -> AnaliseSolo:
     return AnaliseSolo(
         cpfProdutor="68122528082",
-        cnpj="54194116000138",
+        cnpjPropriedade="54194116000138",
         amostrasQuimicas=[
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
@@ -267,7 +267,7 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
     ]
     return SensoriamentoRemoto(
         cpfProdutor="68122528082",
-        cnpj="54194116000138",
+        cnpjPropriedade="54194116000138",
         dataInicial="2021-01-17",
         dataFinal="2024-05-14",
         declividadeMedia=60,

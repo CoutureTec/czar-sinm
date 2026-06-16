@@ -37,13 +37,13 @@ def _remove_none(d: dict) -> dict:
 @dataclass
 class Produtor:
     """Dados do produtor rural."""
-    nome: str
-    """Nome completo do produtor."""
     cpf: str
     """CPF do produtor (somente dígitos, 11 caracteres)."""
+    nome: Optional[str] = None
+    """Nome completo do produtor. Opcional na API."""
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _remove_none(asdict(self))
 
 
 @dataclass
@@ -335,8 +335,8 @@ class AnaliseSolo:
     """Mínimo 1 amostra química obrigatória."""
     cpfProdutor: Optional[str] = None
     """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
-    cnpj: Optional[str] = None
-    """CNPJ da empresa (opcional)."""
+    cnpjPropriedade: Optional[str] = None
+    """CNPJ da propriedade (14 dígitos). Opcional."""
     cnpjLaboratorio: Optional[str] = None
     """CNPJ do laboratório (14 dígitos). Opcional."""
     amostrasFisicas: list[AmostraFisica] = field(default_factory=list)
@@ -348,8 +348,10 @@ class AnaliseSolo:
             d["amostrasFisicas"] = [a.to_dict() for a in self.amostrasFisicas]
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
-        if self.cnpj:
-            d["cnpj"] = self.cnpj
+        if self.cnpjPropriedade:
+            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
+            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
+            d["cnpj"] = self.cnpjPropriedade
         if self.cnpjLaboratorio:
             d["cnpjLaboratorio"] = self.cnpjLaboratorio
         return d
@@ -440,8 +442,10 @@ class SensoriamentoRemoto:
     """Mínimo 1 índice obrigatório."""
     cpfProdutor: Optional[str] = None
     """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
-    cnpj: Optional[str] = None
-    """CNPJ da empresa (opcional)."""
+    cnpjPropriedade: Optional[str] = None
+    """CNPJ da propriedade (14 dígitos). Opcional."""
+    cnpjEmpresaSensoriamento: Optional[str] = None
+    """CNPJ da empresa responsável pelo sensoriamento remoto (14 dígitos). Opcional."""
     codigoSatelitePlantioContorno: Optional[str] = None
     """Código do satélite para plantio em contorno. Ex: 'S08'."""
     codigoSateliteTerraceamento: Optional[str] = None
@@ -465,8 +469,12 @@ class SensoriamentoRemoto:
         }
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
-        if self.cnpj:
-            d["cnpj"] = self.cnpj
+        if self.cnpjPropriedade:
+            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
+            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
+            d["cnpj"] = self.cnpjPropriedade
+        if self.cnpjEmpresaSensoriamento:
+            d["cnpjEmpresaSensoriamento"] = self.cnpjEmpresaSensoriamento
         if self.codigoSatelitePlantioContorno:
             d["codigoSatelitePlantioContorno"] = self.codigoSatelitePlantioContorno
         if self.codigoSateliteTerraceamento:

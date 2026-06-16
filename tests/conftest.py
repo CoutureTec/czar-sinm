@@ -67,7 +67,7 @@ def client(fake_token):
 
 @pytest.fixture
 def produtor():
-    return Produtor(nome="Produtor Teste", cpf="68122528082")
+    return Produtor(cpf="68122528082", nome="Produtor Teste")
 
 
 @pytest.fixture
@@ -149,7 +149,7 @@ def amostra():
 def analise_solo(amostra):
     return AnaliseSolo(
         cpfProdutor="68122528082",
-        cnpj="54194116000138",
+        cnpjPropriedade="54194116000138",
         amostrasQuimicas=[amostra],
     )
 
@@ -158,7 +158,7 @@ def analise_solo(amostra):
 def sensoriamento_remoto():
     return SensoriamentoRemoto(
         cpfProdutor="68122528082",
-        cnpj="54194116000138",
+        cnpjPropriedade="54194116000138",
         dataInicial="2021-01-17",
         dataFinal="2024-05-14",
         declividadeMedia=60,
