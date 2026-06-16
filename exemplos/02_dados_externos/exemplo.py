@@ -274,7 +274,7 @@ def ler_analise_solo(d):
     ] if amostras_fisicas_path.exists() else []
     return AnaliseSolo(
         cpfProdutor=row["cpf_produtor"],
-        cnpj=row["cnpj"],
+        cnpjPropriedade=row["cnpj"],
         amostrasQuimicas=amostras_quimicas,
         amostrasFisicas=amostras_fisicas,
     )
@@ -318,7 +318,7 @@ def ler_sensoriamento_remoto(d):
     ]
     return SensoriamentoRemoto(
         cpfProdutor=row["cpf_produtor"],
-        cnpj=row["cnpj"],
+        cnpjPropriedade=row["cnpj"],
         dataInicial=row["data_inicial"],
         dataFinal=row["data_final"],
         declividadeMedia=int(row["declividade_media"]),
