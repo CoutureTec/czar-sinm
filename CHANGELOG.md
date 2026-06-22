@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+### Adicionado
+- `InterpretacaoManejo`: campo opcional `tipoOperacao` (ex.: 'ARAÇÃO', 'GRADAGEM',
+  'SUBSOLAGEM', 'ESCARIFICAÇÃO'), alinhado ao `InterpretacaoManejoInput` da API.
+- Documentação do comportamento de inconsistência em `InterpretacaoManejo.operacao` e
+  `.tipoOperacao`: valores fora do domínio são aceitos (envio não é rejeitado), mas geram
+  inconsistência na API e são ignorados no cálculo de nível de manejo. Consulte os valores
+  possíveis na documentação (tabelas `operacao` / `tipo_operacao`).
+- Documentação do comportamento de domínio do campo `camada` em `AmostraQuimica`/`AmostraFisica`:
+  qualquer código é aceito; um código fora do domínio é preservado mas gera inconsistência
+  ("Camada não prevista") e não entra no cálculo; '40_060'/'60_100' geram o aviso "Camada não
+  utilizada na classificação". Não enviar o sentinela '00_000'.
+
 ## [0.2.1] — 2025-04-01
 
 ### Adicionado
