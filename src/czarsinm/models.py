@@ -254,8 +254,13 @@ class AmostraQuimica:
     latitude: float
     """Latitude do ponto de coleta."""
     camada: str
-    """Camada de coleta (6 caracteres). Valores aceitos: '00_010', '10_020',
-    '00_020', '20_040', '00_040', '40_060', '60_100'."""
+    """Código da camada (6 caracteres). Usados no cálculo: '00_010', '10_020',
+    '00_020', '20_040' (combinações: '00_020'+'20_040' OU '00_010'+'10_020'+'20_040').
+    Qualquer código é aceito e o envio é persistido: um código fora do domínio é
+    preservado mas a amostra não entra no cálculo e a API registra a inconsistência
+    "Camada não prevista"; '40_060' e '60_100' são válidos porém não usados no cálculo
+    e geram o aviso "Camada não utilizada na classificação". Não enviar '00_000'
+    (sentinela interno; tratado como inválido)."""
     calcio: float
     """Cálcio em cmolc/dm³ (0–50)."""
     magnesio: float
@@ -307,8 +312,10 @@ class AmostraFisica:
     latitude: float
     """Latitude do ponto de coleta."""
     camada: str
-    """Camada de coleta (6 caracteres). Valores aceitos: '00_010', '10_020',
-    '00_020', '20_040', '00_040', '40_060', '60_100'."""
+    """Código da camada (6 caracteres) da amostra física. Valores: '00_040' OU
+    '00_020'+'20_040'. Qualquer código é aceito e o envio é persistido; um código fora
+    do domínio é preservado como camada "Não identificado", sem rejeitar o envio.
+    Não enviar '00_000' (sentinela interno)."""
     areia: float
     """Areia em g/kg (0–100)."""
     silte: float
@@ -365,7 +372,10 @@ class AnaliseSolo:
 class Indice:
     """Índice de vegetação de satélite."""
     codigoSatelite: str
-    """Código do satélite. Ex: 'S01'."""
+    """Código do satélite. Ex: 'S01'. Valores conhecidos: 'S01'–'S09' (ver GET /api/v1/satelites).
+    Um código desconhecido é aceito e o envio é persistido, mas a API registra uma inconsistência
+    ("Código de satélite inválido") e marca o satélite de origem como "Não identificado".
+    Não enviar 'S00' (sentinela interno; tratado como inválido)."""
     longitude: float
     """Longitude do ponto de observação."""
     latitude: float
@@ -413,7 +423,14 @@ class InterpretacaoManejo:
     data: str
     """Data da operação (formato 'YYYY-MM-DD')."""
     operacao: str
-    """Nome da operação. Ex: 'Revolvimento do solo'."""
+    """Nome da operação. Ex: 'Revolvimento do solo'. Único valor reconhecido hoje pelo cálculo
+    de nível de manejo. Uma operação não prevista é aceita (não rejeita o envio), mas gera
+    inconsistência na API e é ignorada no cálculo — impacto pode ser neutro. Consulte os valores
+    possíveis na documentação (tabela `operacao`)."""
+    tipoOperacao: Optional[str] = None
+    """Tipo da operação. Ex: 'ARAÇÃO', 'GRADAGEM', 'SUBSOLAGEM', 'ESCARIFICAÇÃO'. Opcional.
+    Só é validado quando `operacao` é reconhecida; um tipo não previsto é aceito, mas gera
+    inconsistência na API. Consulte os valores possíveis na documentação (tabela `tipo_operacao`)."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -437,7 +454,9 @@ class SensoriamentoRemoto:
     terraceamento: int
     """Terraceamento detectado: 0 ou 1."""
     codigoSateliteDeclividadeMedia: str
-    """Código do satélite usado para declividade. Ex: 'S09'."""
+    """Código do satélite usado para declividade. Ex: 'S09'. Valores conhecidos: 'S01'–'S09'
+    (ver GET /api/v1/satelites). Código desconhecido é aceito, mas gera inconsistência na API
+    (vide `Indice.codigoSatelite`). Não enviar 'S00'."""
     indices: list[Indice]
     """Mínimo 1 índice obrigatório."""
     cpfProdutor: Optional[str] = None
