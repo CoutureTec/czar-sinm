@@ -333,6 +333,36 @@ class SINMClient:
         """
         return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}")
 
+    def consultar_racional(self, chave_classificacao_nm: str) -> dict:
+        """
+        Consulta o racional do cálculo do nível de manejo: *por que* a gleba
+        recebeu aquele NM (indicadores, fatores restritivos e narrativa).
+
+        Disponível apenas para a classificação COMPLETA — uma classificação
+        preliminar ou ainda em processamento responde 404 (NotFoundError).
+
+        A projeção depende dos papéis do usuário autenticado: com
+        OPERADOR_ANALISE_SOLO na empresa operadora, vêm valores/faixas/scores
+        parciais (projeção completa); sem ele, só nome, origem e efeito na nota
+        (projeção compacta).
+
+        Parameters
+        ----------
+        chave_classificacao_nm:
+            Chave obtida no cadastro do talhão/gleba.
+
+        Returns
+        -------
+        dict
+            Racional do cálculo (RacionalCalculoModel).
+
+        Raises
+        ------
+        NotFoundError
+            Se não houver classificação completa para a chave.
+        """
+        return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}/racional")
+
     def listar_classificacoes(self) -> list:
         """Lista todas as classificações do usuário autenticado."""
         return _extrair_lista(self._get("/api/v1/classificacoes"))
