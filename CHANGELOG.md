@@ -18,6 +18,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   qualquer código é aceito; um código fora do domínio é preservado mas gera inconsistência
   ("Camada não prevista") e não entra no cálculo; '40_060'/'60_100' geram o aviso "Camada não
   utilizada na classificação". Não enviar o sentinela '00_000'.
+## [0.3.0.rc2] — 2026-06-16
+
+## [0.3.0.rc1] — 2026-06-16
 
 ## [0.2.1] — 2025-04-01
 
