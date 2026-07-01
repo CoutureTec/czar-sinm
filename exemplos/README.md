@@ -19,3 +19,9 @@ Os dados de entrada ficam em **arquivos CSV organizados por subdiretório** (`ta
 Autentica via **ROPC** (usuário/senha/client) e imprime o **racional do cálculo** de uma classificação a partir da `chaveClassificacaoNM`: indicadores, fatores restritivos e narrativa. Projeção completa ou compacta conforme os papéis do usuário.
 
 → [Ver README](05_racional/README.md)
+
+## [06_racional_por_codigo](06_racional_por_codigo/)
+
+Mesma consulta do exemplo 05, porém dirigida inteiramente pelo `.env`: usa o **ambiente** e o `SINM_GRANT_TYPE` configurados (`client_credentials` — padrão — ou `password`) e recebe o `--codigo` (a `chaveClassificacaoNM`) para imprimir o racional.
+
+→ [Ver README](06_racional_por_codigo/README.md)
