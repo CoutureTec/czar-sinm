@@ -4,7 +4,11 @@ import pytest
 
 from czarsinm import (
     Amostra,
+    AmostraFisica,
+    AmostraQuimica,
     AnaliseSolo,
+    AnaliseSoloFisica,
+    AnaliseSoloQuimica,
     CoberturaSolo,
     Cultura,
     DadoGleba,
@@ -187,26 +191,76 @@ class TestAmostra:
         amostra.phcacl2 = 5.1
         amostra.fosforoResina = 2.3
         amostra.arilsulfatase = 100.0
-        amostra.betaGlicosidade = 50.0
+        amostra.betaGlicosidase = 50.0
         amostra.densidadeSolo = 1.2
         d = amostra.to_dict()
         assert d["phcacl2"] == 5.1
         assert d["fosforoResina"] == 2.3
         assert d["arilsulfatase"] == 100.0
-        assert d["betaGlicosidade"] == 50.0
         assert d["densidadeSolo"] == 1.2
 
 
 # ---------------------------------------------------------------------------
-# AnaliseSolo
+# AmostraQuimica — grafia da beta-glicosidase (#261 / v6.2026)
+# ---------------------------------------------------------------------------
+
+class TestBetaGlicosidase:
+    def _amostra(self, **kwargs):
+        base = dict(
+            cpfResponsavelColeta="21750077078",
+            dataColeta="2024-09-17",
+            longitude=-47.1,
+            latitude=-22.8,
+            camada="00_020",
+            calcio=0.9, magnesio=0.8, potassio=59.9,
+            aluminio=0.36, acidezPotencial=5.0, enxofre=6.4, mos=10.8,
+        )
+        base.update(kwargs)
+        return AmostraQuimica(**base)
+
+    def test_v1_envia_as_duas_grafias(self):
+        """O v1 leva canônica + legada: a produção ainda só conhece a legada."""
+        d = self._amostra(betaGlicosidase=50.0).to_dict("v1")
+        assert d["betaGlicosidase"] == 50.0
+        assert d["betaGlicosidade"] == 50.0
+
+    def test_v2_envia_apenas_a_canonica(self):
+        d = self._amostra(betaGlicosidase=50.0).to_dict("v2")
+        assert d["betaGlicosidase"] == 50.0
+        assert "betaGlicosidade" not in d
+
+    def test_grafia_legada_alimenta_a_canonica_com_aviso(self):
+        with pytest.deprecated_call():
+            amostra = self._amostra(betaGlicosidade=50.0)
+        assert amostra.betaGlicosidase == 50.0
+        assert amostra.to_dict("v2")["betaGlicosidase"] == 50.0
+
+    def test_grafias_conflitantes_levantam_erro(self):
+        with pytest.raises(ValueError, match="valores diferentes"):
+            self._amostra(betaGlicosidase=50.0, betaGlicosidade=70.0)
+
+    def test_omitida_nao_aparece_em_nenhum_contrato(self):
+        for contrato in ("v1", "v2"):
+            d = self._amostra().to_dict(contrato)
+            assert "betaGlicosidase" not in d
+            assert "betaGlicosidade" not in d
+
+    def test_contrato_invalido(self):
+        with pytest.raises(ValueError, match="não reconhecido"):
+            self._amostra().to_dict("v3")
+
+
+# ---------------------------------------------------------------------------
+# AnaliseSolo (payload combinado, exclusivo do v1)
 # ---------------------------------------------------------------------------
 
 class TestAnaliseSolo:
     def test_to_dict_com_cpf_e_cnpj(self, analise_solo):
         d = analise_solo.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpj"] == "54194116000138"
-        assert "cnpjPropriedade" not in d
+        assert d["cnpjPropriedade"] == "54194116000138"
+        # A chave legada "cnpj" não é mais emitida: dev/hml/prd já aceitam a canônica.
+        assert "cnpj" not in d
         assert isinstance(d["amostrasQuimicas"], list)
         assert len(d["amostrasQuimicas"]) == 1
         assert "amostrasFisicas" not in d
@@ -217,6 +271,74 @@ class TestAnaliseSolo:
         assert "cpfProdutor" not in d
         assert "cnpjPropriedade" not in d
         assert "cnpj" not in d
+
+    def test_combinado_nao_existe_no_v2(self, analise_solo):
+        with pytest.raises(ValueError, match="não existe no contrato v2"):
+            analise_solo.to_dict("v2")
+
+    def test_separar_devolve_as_duas_metades(self, amostra, amostra_fisica):
+        a = AnaliseSolo(
+            amostrasQuimicas=[amostra],
+            amostrasFisicas=[amostra_fisica],
+            cpfProdutor="68122528082",
+            cnpjPropriedade="54194116000138",
+            cnpjLaboratorio="13610724000107",
+        )
+        quimica, fisica = a.separar()
+        assert quimica.amostrasQuimicas == [amostra]
+        assert quimica.cnpjLaboratorio == "13610724000107"
+        assert fisica is not None
+        assert fisica.amostrasFisicas == [amostra_fisica]
+        assert fisica.cpfProdutor == "68122528082"
+
+    def test_separar_sem_amostras_fisicas(self, amostra):
+        quimica, fisica = AnaliseSolo(amostrasQuimicas=[amostra]).separar()
+        assert quimica.amostrasQuimicas == [amostra]
+        assert fisica is None
+
+
+# ---------------------------------------------------------------------------
+# AnaliseSoloQuimica / AnaliseSoloFisica (endpoints por tipo)
+# ---------------------------------------------------------------------------
+
+class TestAnaliseSoloPorTipo:
+    def test_quimica_v1(self, amostra):
+        a = AnaliseSoloQuimica(
+            amostrasQuimicas=[amostra],
+            cpfProdutor="68122528082",
+            cnpjPropriedade="54194116000138",
+        )
+        d = a.to_dict("v1")
+        assert d["cpfProdutor"] == "68122528082"
+        assert d["cnpjPropriedade"] == "54194116000138"
+        assert len(d["amostrasQuimicas"]) == 1
+        assert "amostrasFisicas" not in d
+
+    def test_fisica_v1(self, amostra_fisica):
+        a = AnaliseSoloFisica(amostrasFisicas=[amostra_fisica], cpfProdutor="68122528082")
+        d = a.to_dict("v1")
+        assert len(d["amostrasFisicas"]) == 1
+        assert "amostrasQuimicas" not in d
+
+    def test_v2_exige_cnpj_laboratorio(self, amostra):
+        a = AnaliseSoloQuimica(amostrasQuimicas=[amostra], cpfProdutor="68122528082")
+        with pytest.raises(ValueError, match="cnpjLaboratorio"):
+            a.to_dict("v2")
+
+    def test_v2_com_cnpj_laboratorio(self, amostra):
+        a = AnaliseSoloQuimica(
+            amostrasQuimicas=[amostra],
+            cpfProdutor="68122528082",
+            cnpjLaboratorio="13610724000107",
+        )
+        d = a.to_dict("v2")
+        assert d["cnpjLaboratorio"] == "13610724000107"
+
+    def test_v1_nao_exige_cnpj_laboratorio(self, amostra_fisica):
+        d = AnaliseSoloFisica(
+            amostrasFisicas=[amostra_fisica], cpfProdutor="68122528082"
+        ).to_dict("v1")
+        assert "cnpjLaboratorio" not in d
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +378,9 @@ class TestSensoriamentoRemoto:
     def test_to_dict_campos_opcionais_presentes(self, sensoriamento_remoto):
         d = sensoriamento_remoto.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpj"] == "54194116000138"
-        assert "cnpjPropriedade" not in d
+        assert d["cnpjPropriedade"] == "54194116000138"
+        # A chave legada "cnpj" não é mais emitida: dev/hml/prd já aceitam a canônica.
+        assert "cnpj" not in d
         assert d["codigoSatelitePlantioContorno"] == "S08"
         assert d["codigoSateliteTerraceamento"] == "S07"
 

@@ -18,6 +18,45 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   qualquer código é aceito; um código fora do domínio é preservado mas gera inconsistência
   ("Camada não prevista") e não entra no cálculo; '40_060'/'60_100' geram o aviso "Camada não
   utilizada na classificação". Não enviar o sentinela '00_000'.
+- **Suporte à v6.2026 (HML 04/08/2026).**
+- `consultar_analises_disponiveis(cpf, data_referencia=None)`: lista as análises de solo
+  disponíveis para um CPF. Traz `uuidAnaliseSolo`, que permite buscar a análise completa
+  sem depender da chave de classificação. Sempre em `/api/v1`.
+- Endpoints por tipo de análise, com os modelos `AnaliseSoloQuimica` e `AnaliseSoloFisica`:
+  `cadastrar/atualizar/buscar/listar_analise(s)_solo_quimica(s)` e `..._fisica(s)`.
+- `AnaliseSolo.separar()`: divide o payload combinado em `(química, física)` para uso com
+  os endpoints por tipo.
+- `atualizar_sensoriamento_remoto(uuid, sensoriamento)` e
+  `remover_sensoriamento_remoto(uuid)`.
+- Parâmetro `api_version` em `SINMClient` (`'v1'` default, `'v2'` opt-in) e propriedade
+  `client.api_version`. Em `v2` o `cnpjLaboratorio` é obrigatório — o SDK valida antes de
+  enviar — e o payload combinado não existe (`cadastrar_analise_solo` levanta `ValueError`).
+  Gleba, operação, classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois
+  modos.
+- `AmostraQuimica.betaGlicosidase`: grafia canônica do indicador.
+- `consultar_racional`: documentação dos campos causais da v6.2026
+  (`regraDeterminante`, `limitantesPrincipais`, `papelNaNota`, `contribuicao`), com os
+  valores possíveis de cada enum.
+
+### Alterado
+- Payloads passam a enviar `cnpjPropriedade` (nome canônico) em vez da chave legada `cnpj`,
+  em análise de solo e sensoriamento remoto. Todos os ambientes já aceitam a canônica.
+- Em `v1`, `betaGlicosidase` é enviado junto com o nome legado `betaGlicosidade`, porque os
+  ambientes em produção ainda só conhecem a grafia antiga. Em `v2` só a canônica é enviada.
+- Exemplos `05_racional` e `06_racional_por_codigo`: passam a exibir a leitura causal
+  (regra determinante, limitantes, papel e contribuição de cada indicador). O mapa de
+  `efeitoNaNota` estava desatualizado — usava valores que a API nunca retornou.
+
+### Depreciado
+- `AmostraQuimica.betaGlicosidade` (erro de grafia): use `betaGlicosidase`. Informar as duas
+  com valores diferentes é erro; informar só a antiga emite `DeprecationWarning`.
+- `buscar_analise_solo(uuid)`: a rota `/api/v1/analises-solo/{uuid}` não existe em nenhum
+  ambiente — o método sempre falhou. Agora emite `DeprecationWarning` e delega para
+  `buscar_analise_solo_quimica`.
+- Campo `efeitoNaNota` do racional: continua na resposta, mas compara o indicador com a
+  nota *final*, então indicadores que causaram um teto saem como `NEUTRO`. Prefira
+  `papelNaNota` + `contribuicao`.
+
 ## [0.3.0.rc2] — 2026-06-16
 
 ## [0.3.0.rc1] — 2026-06-16

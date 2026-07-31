@@ -5,14 +5,19 @@ Autentica o usuário humano no Keycloak via ROPC (grant_type=password) com
 usuário / senha / client, consulta o racional do cálculo de uma classificação
 (pela chaveClassificacaoNM) e imprime de forma legível.
 
-O racional explica *por que* a gleba recebeu aquele nível de manejo: os
-indicadores avaliados, os fatores restritivos ativados e a narrativa do
-cálculo. Só existe para a classificação COMPLETA — preliminar/sem cálculo
-responde "não disponível" (404).
+O racional explica *por que* a gleba recebeu aquele nível de manejo: a regra
+que determinou a nota, os indicadores limitantes, os fatores restritivos
+ativados e a narrativa do cálculo. Só existe para a classificação COMPLETA —
+preliminar/sem cálculo responde "não disponível" (404).
+
+Desde a v6.2026 a leitura é causal: `regraDeterminante` e `limitantesPrincipais`
+na classificação, `papelNaNota` e `contribuicao` por indicador. O antigo
+`efeitoNaNota` continua na resposta, mas está depreciado (ele compara com a nota
+final, então some quando um teto trava a nota).
 
 A projeção depende dos papéis do usuário na empresa operadora da gleba:
-  - com OPERADOR_ANALISE_SOLO  → completa (valor, faixa e score de cada indicador)
-  - sem OPERADOR_ANALISE_SOLO  → compacta (só nome, origem e efeito na nota)
+  - com OPERADOR_ANALISE_SOLO  → completa (valor, faixa, score e contribuição)
+  - sem OPERADOR_ANALISE_SOLO  → compacta (nome, origem e papel na nota)
 
 Uso:
     python exemplo.py --chave SUA_CHAVE
@@ -94,14 +99,39 @@ if not CHAVE:
 # --------------------------------------------------------------------------
 # Apresentação do racional
 # --------------------------------------------------------------------------
-def _efeito_legivel(efeito) -> str:
+def _papel_legivel(papel) -> str:
     nomes = {
-        "PUXOU_PARA_CIMA": "puxou a nota para cima",
-        "PUXOU_PARA_BAIXO": "puxou a nota para baixo",
-        "NEUTRO": "efeito neutro",
+        "LIMITANTE_PRINCIPAL": "limitante principal",
+        "LIMITANTE": "limitante",
+        "FAVORAVEL": "favorável",
         "ALINHADO": "alinhado à nota",
     }
-    return nomes.get(efeito, str(efeito or "—"))
+    return nomes.get(papel, str(papel or "—"))
+
+
+def _contribuicao_legivel(contribuicao) -> str:
+    nomes = {
+        "ACIMA": "acima da média",
+        "NA_MEDIA": "na média",
+        "ABAIXO": "abaixo da média",
+    }
+    return nomes.get(contribuicao, str(contribuicao or "—"))
+
+
+def _regra_legivel(regra) -> str:
+    nomes = {
+        "BANDA_DA_MEDIA": "a nota veio da média dos indicadores",
+        "DOIS_OU_MAIS_NM1": "dois ou mais indicadores em NM1",
+        "DOIS_OU_MAIS_NM2": "dois ou mais indicadores em NM2",
+        "UM_NM1_UM_NM2": "um indicador em NM1 e outro em NM2",
+        "SATURACAO_ALUMINIO_CRITICA": "saturação por alumínio crítica",
+        "SATURACAO_ALUMINIO_ALTA": "saturação por alumínio alta",
+        "SOJA_EM_SUCESSAO": "soja em sucessão",
+        "LEGUMINOSAS_EM_SUCESSAO": "leguminosas em sucessão",
+        "DECLIVIDADE_ACENTUADA": "declividade acentuada",
+        "TETO_AMBIENTAL": "teto ambiental",
+    }
+    return nomes.get(regra, str(regra or "—"))
 
 
 def imprimir_racional(r: dict) -> None:
@@ -123,6 +153,17 @@ def imprimir_racional(r: dict) -> None:
     if r.get("dataCalculo"):
         print(f"  Data do cálculo : {r.get('dataCalculo')}")
 
+    # -- Por que essa nota (v6.2026) ---------------------------------------
+    if r.get("regraDeterminante"):
+        print()
+        print(f"  Regra determinante : {r['regraDeterminante']}")
+        print(f"    → {_regra_legivel(r['regraDeterminante'])}")
+    limitantes = r.get("limitantesPrincipais") or []
+    if limitantes:
+        print(f"  Limitantes         : {', '.join(limitantes)}")
+    elif r.get("regraDeterminante"):
+        print("  Limitantes         : (nenhum)")
+
     # -- Indicadores -------------------------------------------------------
     print()
     print(SEP_)
@@ -131,17 +172,20 @@ def imprimir_racional(r: dict) -> None:
     for ind in indicadores:
         nome = ind.get("nome", "?")
         origem = ind.get("origem", "")
-        efeito = _efeito_legivel(ind.get("efeitoNaNota"))
+        papel = _papel_legivel(ind.get("papelNaNota"))
+        marca = "!" if ind.get("papelNaNota") == "LIMITANTE_PRINCIPAL" else "*"
         if completa:
             valor = ind.get("valor")
             unidade = ind.get("unidade") or ""
             faixa = ind.get("faixa")
             score = ind.get("scoreParcial")
+            contribuicao = _contribuicao_legivel(ind.get("contribuicao"))
             valor_str = f"{valor} {unidade}".strip() if valor is not None else "—"
-            print(f"  * {nome} ({origem})")
-            print(f"      valor: {valor_str} | faixa: {faixa} | score: {score}/4 | {efeito}")
+            print(f"  {marca} {nome} ({origem})")
+            print(f"      valor: {valor_str} | faixa: {faixa} | score: {score}/4")
+            print(f"      papel: {papel} | contribuição: {contribuicao}")
         else:
-            print(f"  * {nome} ({origem}) — {efeito}")
+            print(f"  {marca} {nome} ({origem}) — {papel}")
 
     # -- Fatores restritivos ----------------------------------------------
     print()

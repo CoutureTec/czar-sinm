@@ -9,7 +9,10 @@ import pytest
 from czarsinm import (
     SINMClient,
     Amostra,
+    AmostraFisica,
     AnaliseSolo,
+    AnaliseSoloFisica,
+    AnaliseSoloQuimica,
     CoberturaSolo,
     Cultura,
     DadoGleba,
@@ -57,6 +60,25 @@ def client(fake_token):
     auth_mock.auth_header = {"Authorization": f"Bearer {fake_token}"}
     auth_mock.roles = ["OPERADOR_CONTRATOS", "BETA_USER"]
     auth_mock.client_roles = {"client-id": ["OPERADOR_CONTRATOS", "BETA_USER"]}
+    c._auth = auth_mock
+    return c
+
+
+@pytest.fixture
+def client_v2(fake_token):
+    """SINMClient apontado para o contrato v2 (análise de solo e sensoriamento)."""
+    c = SINMClient(
+        username="usuario@test.br",
+        password="senha",
+        client_id="client-id",
+        client_secret="client-secret",
+        ambiente="hml",
+        api_version="v2",
+    )
+    auth_mock = MagicMock(spec=KeycloakAuth)
+    auth_mock.auth_header = {"Authorization": f"Bearer {fake_token}"}
+    auth_mock.roles = ["OPERADOR_ANALISE_SOLO"]
+    auth_mock.client_roles = {"client-id": ["OPERADOR_ANALISE_SOLO"]}
     c._auth = auth_mock
     return c
 
@@ -142,6 +164,40 @@ def amostra():
         calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
         aluminio=0.36, acidezPotencial=5.0, phh2o=5.4,
         fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
+    )
+
+
+@pytest.fixture
+def amostra_fisica():
+    return AmostraFisica(
+        cpfResponsavelColeta="21750077078",
+        dataColeta="2024-09-17",
+        longitude=-47.108493,
+        latitude=-22.811532,
+        camada="00_040",
+        areia=45.0,
+        silte=25.0,
+        argila=30.0,
+    )
+
+
+@pytest.fixture
+def analise_solo_quimica(amostra):
+    return AnaliseSoloQuimica(
+        cpfProdutor="68122528082",
+        cnpjPropriedade="54194116000138",
+        cnpjLaboratorio="13610724000107",
+        amostrasQuimicas=[amostra],
+    )
+
+
+@pytest.fixture
+def analise_solo_fisica(amostra_fisica):
+    return AnaliseSoloFisica(
+        cpfProdutor="68122528082",
+        cnpjPropriedade="54194116000138",
+        cnpjLaboratorio="13610724000107",
+        amostrasFisicas=[amostra_fisica],
     )
 
 

@@ -12,35 +12,61 @@ Fluxo principal:
 from __future__ import annotations
 
 import logging
+import re
+import warnings
 from typing import Optional
 
 import requests
 
 from .auth import KeycloakAuth
 from .exceptions import APIError, NotFoundError, PermissaoError, ValidationError
-from .models import DadoGleba, AnaliseSolo, SensoriamentoRemoto, DadosInput
+from .models import (
+    AnaliseSolo,
+    AnaliseSoloFisica,
+    AnaliseSoloQuimica,
+    DadoGleba,
+    DadosInput,
+    SensoriamentoRemoto,
+)
 
 logger = logging.getLogger(__name__)
 
 # URLs padrão por ambiente
-API_URLS = {    
+API_URLS = {
     "hml": "https://www.zarcnm-h.cnptia.embrapa.br",
     "prd": "https://www.zarcnm.cnptia.embrapa.br",
 }
 
-# Roles exigidos por prefixo de endpoint (ordem: mais específico primeiro)
+API_VERSIONS = ("v1", "v2")
+"""Versões de contrato da API que o cliente sabe endereçar.
+
+O ``v2`` cobre apenas análise de solo (por tipo) e sensoriamento remoto — gleba,
+operação e classificação existem só no ``v1`` e continuam sendo chamadas lá.
+"""
+
+# Roles exigidos por sufixo de endpoint, já sem o prefixo /api/vN
+# (ordem: mais específico primeiro)
 _ENDPOINT_ROLES = [
-    ("/api/v1/glebas",                  ["OPERADOR_CONTRATOS"]),
-    ("/api/v1/operacoes",               ["OPERADOR_CONTRATOS"]),
-    ("/api/v1/classificacoes",          ["OPERADOR_CONTRATOS",]),
-    ("/api/v1/analises-solo",           ["OPERADOR_ANALISE_SOLO"]),
-    ("/api/v1/sensoriamentos-remotos",  ["OPERADOR_SENSORIAMENTO_REMOTO"]),
+    ("/glebas",                    ["OPERADOR_CONTRATOS"]),
+    ("/operacoes",                 ["OPERADOR_CONTRATOS"]),
+    ("/classificacoes",            ["OPERADOR_CONTRATOS",]),
+    ("/analises-solo/disponiveis", ["OPERADOR_ANALISE_SOLO", "OPERADOR_CONTRATOS"]),
+    ("/analises-solo",             ["OPERADOR_ANALISE_SOLO"]),
+    ("/sensoriamentos-remotos",    ["OPERADOR_SENSORIAMENTO_REMOTO"]),
 ]
+
+_PREFIXO_VERSAO = re.compile(r"^/api/v\d+")
 
 
 def _roles_para_endpoint(path: str) -> list:
+    """Roles exigidos pelo endpoint, independentemente da versão do contrato.
+
+    A autorização é idêntica no v1 e no v2 (só o payload muda), então o prefixo
+    ``/api/vN`` é descartado antes de casar o sufixo.
+    """
+    sufixo = _PREFIXO_VERSAO.sub("", path, count=1)
     for prefix, roles in _ENDPOINT_ROLES:
-        if path.startswith(prefix):
+        if sufixo.startswith(prefix):
             return roles
     return []
 
@@ -106,6 +132,7 @@ class SINMClient:
         proxies: Optional[dict] = None,
         timeout: int = 60,
         grant_type: Optional[str] = None,
+        api_version: str = "v1",
     ):
         """
         Parameters
@@ -138,12 +165,24 @@ class SINMClient:
             Proxies para requests. Ex: {'https': 'http://proxy.cnptia.embrapa.br:3128'}
         timeout:
             Timeout em segundos para chamadas à API.
+        api_version:
+            Contrato da API para análise de solo e sensoriamento remoto: 'v1'
+            (padrão, contrato congelado — aceita os nomes legados) ou 'v2'
+            (contrato limpo: só nomes canônicos e ``cnpjLaboratorio``
+            obrigatório). O v2 estreia em homologação em 04/08/2026; em produção,
+            na entrega seguinte. Gleba, operação e classificação não têm v2 e são
+            sempre chamadas no /api/v1.
         """
         if ambiente not in API_URLS and base_url is None:
             raise ValueError(
                 f"Ambiente '{ambiente}' não reconhecido. "
                 "Para ambientes customizados, informe 'base_url' "
                 "(ou defina SINM_BACKEND_URL no arquivo .env)."
+            )
+        if api_version not in API_VERSIONS:
+            raise ValueError(
+                f"api_version '{api_version}' não reconhecida. "
+                f"Use uma de: {', '.join(API_VERSIONS)}."
             )
         self._auth = KeycloakAuth(
             client_id=client_id,
@@ -159,7 +198,17 @@ class SINMClient:
         self._base_url = (base_url or API_URLS.get(ambiente, API_URLS["hml"])).rstrip("/")
         self._proxies = proxies
         self._timeout = timeout
+        self._api_version = api_version
         self._session = requests.Session()
+
+    @property
+    def api_version(self) -> str:
+        """Contrato usado nas rotas de análise de solo e sensoriamento ('v1' ou 'v2')."""
+        return self._api_version
+
+    def _rota(self, recurso: str) -> str:
+        """Path do recurso na versão configurada. Ex.: '/analises-solo' → '/api/v2/analises-solo'."""
+        return f"/api/{self._api_version}{recurso}"
 
     @property
     def roles(self) -> list:
@@ -215,7 +264,12 @@ class SINMClient:
         chave_classificacao_nm: Optional[str] = None,
     ) -> dict:
         """
-        Cadastra uma análise de solo.
+        Cadastra uma análise de solo pelo payload **combinado** (química + física).
+
+        Fachada legada do ``/api/v1``: cria as duas metades — química e física —
+        numa única transação. Mantida sem prazo de remoção, mas não existe no v2:
+        com ``api_version='v2'`` use :meth:`cadastrar_analise_solo_quimica` e
+        :meth:`cadastrar_analise_solo_fisica` (ou ``AnaliseSolo.separar()``).
 
         Parameters
         ----------
@@ -229,21 +283,158 @@ class SINMClient:
         Returns
         -------
         dict
-            Resumo da análise cadastrada.
+            Resumo das duas metades cadastradas (``{'quimica': ..., 'fisica': ...}``).
         """
+        if self._api_version != "v1":
+            raise ValueError(
+                "O cadastro combinado existe apenas no /api/v1. Com api_version='v2' "
+                "use cadastrar_analise_solo_quimica/cadastrar_analise_solo_fisica."
+            )
+        path = "/api/v1/analises-solo"
         if chave_classificacao_nm:
-            path = f"/api/v1/analises-solo/{chave_classificacao_nm}"
-        else:
-            path = "/api/v1/analises-solo"
-        return self._post(path, analise.to_dict())
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict("v1"))
 
     def buscar_analise_solo(self, uuid_analise: str) -> dict:
-        """Busca uma análise de solo pelo UUID."""
-        return self._get(f"/api/v1/analises-solo/{uuid_analise}")
+        """DEPRECIADO — use :meth:`buscar_analise_solo_quimica` ou
+        :meth:`buscar_analise_solo_fisica`.
+
+        A consulta de análise de solo é **por tipo**: não existe (nem existia)
+        ``GET /analises-solo/{uuid}``. Este método delega para a metade química,
+        que é o registro primário criado pelo cadastro combinado.
+        """
+        warnings.warn(
+            "buscar_analise_solo está depreciado: a consulta é por tipo. Use "
+            "buscar_analise_solo_quimica ou buscar_analise_solo_fisica.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.buscar_analise_solo_quimica(uuid_analise)
 
     def listar_analises_solo(self) -> list:
-        """Lista as análises de solo do usuário autenticado."""
+        """Lista as análises de solo (metade química) do usuário autenticado.
+
+        No ``/api/v1`` a rota combinada continua respondendo por compatibilidade;
+        prefira :meth:`listar_analises_solo_quimicas` / :meth:`listar_analises_solo_fisicas`.
+        """
+        if self._api_version != "v1":
+            return self.listar_analises_solo_quimicas()
         return _extrair_lista(self._get("/api/v1/analises-solo"))
+
+    # -- Análise de solo por tipo (química / física) --------------------
+
+    def cadastrar_analise_solo_quimica(
+        self,
+        analise: AnaliseSoloQuimica,
+        chave_classificacao_nm: Optional[str] = None,
+    ) -> dict:
+        """Cadastra uma análise de solo **química**.
+
+        Sem ``chave_classificacao_nm`` o vínculo é feito pelo CPF do produtor no
+        payload. No contrato v2 o ``cnpjLaboratorio`` é obrigatório — o modelo
+        levanta ``ValueError`` antes da chamada, em vez de deixar a API responder 400.
+        """
+        path = self._rota("/analises-solo/quimica")
+        if chave_classificacao_nm:
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict(self._api_version))
+
+    def atualizar_analise_solo_quimica(self, uuid_analise: str, analise: AnaliseSoloQuimica) -> dict:
+        """Substitui os dados de uma análise de solo química já cadastrada."""
+        return self._put(
+            f"{self._rota('/analises-solo/quimica')}/{uuid_analise}",
+            analise.to_dict(self._api_version),
+        )
+
+    def buscar_analise_solo_quimica(self, uuid_analise: str) -> dict:
+        """Busca uma análise de solo química pelo UUID.
+
+        Quem cadastrou a análise recebe a visão completa; quem apenas opera a
+        classificação recebe a visão parcial (sem amostras nem laboratório). O uuid
+        de uma análise física neste endpoint responde 404.
+        """
+        return self._get(f"{self._rota('/analises-solo/quimica')}/{uuid_analise}")
+
+    def listar_analises_solo_quimicas(self) -> list:
+        """Lista as análises de solo químicas do usuário autenticado."""
+        return _extrair_lista(self._get(self._rota("/analises-solo/quimica")))
+
+    def cadastrar_analise_solo_fisica(
+        self,
+        analise: AnaliseSoloFisica,
+        chave_classificacao_nm: Optional[str] = None,
+    ) -> dict:
+        """Cadastra uma análise de solo **física**.
+
+        Sem ``chave_classificacao_nm`` o vínculo é feito pelo CPF do produtor no
+        payload. No contrato v2 o ``cnpjLaboratorio`` é obrigatório.
+        """
+        path = self._rota("/analises-solo/fisica")
+        if chave_classificacao_nm:
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict(self._api_version))
+
+    def atualizar_analise_solo_fisica(self, uuid_analise: str, analise: AnaliseSoloFisica) -> dict:
+        """Substitui os dados de uma análise de solo física já cadastrada."""
+        return self._put(
+            f"{self._rota('/analises-solo/fisica')}/{uuid_analise}",
+            analise.to_dict(self._api_version),
+        )
+
+    def buscar_analise_solo_fisica(self, uuid_analise: str) -> dict:
+        """Busca uma análise de solo física pelo UUID.
+
+        Mesmas regras da química: visão completa para quem cadastrou, parcial para
+        quem só opera a classificação. O uuid de uma análise química aqui responde 404.
+        """
+        return self._get(f"{self._rota('/analises-solo/fisica')}/{uuid_analise}")
+
+    def listar_analises_solo_fisicas(self) -> list:
+        """Lista as análises de solo físicas do usuário autenticado."""
+        return _extrair_lista(self._get(self._rota("/analises-solo/fisica")))
+
+    # -- Disponibilidade por CPF do produtor ----------------------------
+
+    def consultar_analises_disponiveis(
+        self,
+        cpf: str,
+        data_referencia: Optional[str] = None,
+    ) -> dict:
+        """
+        Diz **quais análises de solo o produtor já tem e até quando valem**, sem
+        expor o conteúdo.
+
+        Responde duas listas independentes — ``analisesQuimicas`` e
+        ``analisesFisicas`` —, cada item com ``uuidAnaliseSolo``, ``validaAte``,
+        ``valida`` e ``motivoInvalidade`` (``RN15`` quando expirada). Ordenadas da
+        validade mais distante para a mais próxima; as expiradas também vêm, com
+        ``valida=false``.
+
+        Com o ``uuidAnaliseSolo`` em mãos, consulte a análise em
+        :meth:`buscar_analise_solo_quimica` ou :meth:`buscar_analise_solo_fisica`,
+        **conforme a lista de onde o item veio** — o uuid de uma no endpoint da outra
+        responde 404. O uuid identifica, não autoriza: consultar a análise segue
+        exigindo ``OPERADOR_ANALISE_SOLO`` na operadora da classificação.
+
+        Só existe no ``/api/v1``: é chamada nessa rota mesmo com ``api_version='v2'``.
+
+        Parameters
+        ----------
+        cpf:
+            CPF do produtor (somente dígitos). A consulta não é restrita à sua
+            carteira de clientes.
+        data_referencia:
+            Data ('YYYY-MM-DD') usada para decidir a validade. Default: hoje.
+
+        Returns
+        -------
+        dict
+            ``{'analisesQuimicas': [...], 'analisesFisicas': [...]}``
+        """
+        params = {"cpf": cpf}
+        if data_referencia:
+            params["dataReferencia"] = data_referencia
+        return self._get("/api/v1/analises-solo/disponiveis", params=params)
 
     # ------------------------------------------------------------------
     # Sensoriamento Remoto
@@ -271,17 +462,32 @@ class SINMClient:
             Resumo do sensoriamento cadastrado.
         """
         return self._post(
-            f"/api/v1/sensoriamentos-remotos/{chave_classificacao_nm}",
-            sensoriamento.to_dict(),
+            f"{self._rota('/sensoriamentos-remotos')}/{chave_classificacao_nm}",
+            sensoriamento.to_dict(self._api_version),
+        )
+
+    def atualizar_sensoriamento_remoto(
+        self,
+        uuid_sensoriamento: str,
+        sensoriamento: SensoriamentoRemoto,
+    ) -> dict:
+        """Substitui os dados de um sensoriamento remoto já cadastrado."""
+        return self._put(
+            f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}",
+            sensoriamento.to_dict(self._api_version),
         )
 
     def buscar_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
         """Busca um sensoriamento remoto pelo UUID."""
-        return self._get(f"/api/v1/sensoriamentos-remotos/{uuid_sensoriamento}")
+        return self._get(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
 
     def listar_sensoriamentos_remotos(self) -> list:
         """Lista os sensoriamentos do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/sensoriamentos-remotos"))
+        return _extrair_lista(self._get(self._rota("/sensoriamentos-remotos")))
+
+    def remover_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
+        """Remove um sensoriamento remoto pelo UUID (204 → dict vazio)."""
+        return self._delete(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
 
     # ------------------------------------------------------------------
     # Operação (fluxo combinado por UUIDs)
@@ -343,8 +549,31 @@ class SINMClient:
 
         A projeção depende dos papéis do usuário autenticado: com
         OPERADOR_ANALISE_SOLO na empresa operadora, vêm valores/faixas/scores
-        parciais (projeção completa); sem ele, só nome, origem e efeito na nota
-        (projeção compacta).
+        parciais (projeção completa); sem ele, só os campos de causa e o efeito na
+        nota (projeção compacta).
+
+        Leitura causal (v6.2026)
+        ------------------------
+        A nota nem sempre vem da média: regras de teto podem fixá-la. Quatro campos
+        dizem *qual* fator limitou:
+
+        - ``regraDeterminante`` (na classificação) — regra que fixou a nota:
+          ``DOIS_OU_MAIS_NM1``, ``DOIS_OU_MAIS_NM2``, ``UM_NM1_UM_NM2``,
+          ``SATURACAO_ALUMINIO_CRITICA``, ``SATURACAO_ALUMINIO_ALTA``,
+          ``SOJA_EM_SUCESSAO``, ``LEGUMINOSAS_EM_SUCESSAO``,
+          ``DECLIVIDADE_ACENTUADA``, ``TETO_AMBIENTAL``, ou ``BANDA_DA_MEDIA``
+          quando a nota veio mesmo da média.
+        - ``limitantesPrincipais`` (na classificação) — nomes dos indicadores que
+          foram o gatilho da regra. Vazio quando não há limitante (ex.: NM4).
+        - ``papelNaNota`` (por indicador) — ``LIMITANTE_PRINCIPAL``, ``LIMITANTE``,
+          ``FAVORAVEL`` ou ``ALINHADO``. Vem nas duas projeções.
+        - ``contribuicao`` (por indicador) — ``ACIMA``, ``NA_MEDIA`` ou ``ABAIXO``
+          em relação ao score médio. Só na projeção completa.
+
+        ``efeitoNaNota`` (``ELEVOU``/``REBAIXOU``/``NEUTRO``) continua na resposta
+        com o mesmo comportamento, porém **depreciado**: ele compara o indicador com
+        a nota *final*, então quando a nota é travada por um teto os indicadores que
+        a causaram saem como ``NEUTRO``. Prefira ``papelNaNota`` + ``contribuicao``.
 
         Parameters
         ----------
@@ -394,12 +623,44 @@ class SINMClient:
 
         return self._handle_response(resp, path)
 
-    def _get(self, path: str):
+    def _put(self, path: str, payload: dict) -> dict:
         url = self._base_url + path
-        logger.debug("GET %s", url)
+        logger.debug("PUT %s", url)
+        try:
+            resp = self._session.put(
+                url,
+                json=payload,
+                headers=self._headers(),
+                timeout=self._timeout,
+                proxies=self._proxies,
+            )
+        except requests.RequestException as exc:
+            raise APIError(0, f"Erro de conexão: {exc}") from exc
+
+        return self._handle_response(resp, path)
+
+    def _delete(self, path: str) -> dict:
+        url = self._base_url + path
+        logger.debug("DELETE %s", url)
+        try:
+            resp = self._session.delete(
+                url,
+                headers=self._headers(),
+                timeout=self._timeout,
+                proxies=self._proxies,
+            )
+        except requests.RequestException as exc:
+            raise APIError(0, f"Erro de conexão: {exc}") from exc
+
+        return self._handle_response(resp, path)
+
+    def _get(self, path: str, params: Optional[dict] = None):
+        url = self._base_url + path
+        logger.debug("GET %s params=%s", url, params)
         try:
             resp = self._session.get(
                 url,
+                params=params,
                 headers=self._headers(),
                 timeout=self._timeout,
                 proxies=self._proxies,

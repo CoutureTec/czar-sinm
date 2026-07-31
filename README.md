@@ -189,23 +189,69 @@ client.cadastrar_gleba(dado_gleba)               # POST /api/v1/glebas
 client.buscar_gleba(uuid)                        # GET  /api/v1/glebas/{uuid}
 client.listar_glebas()                           # GET  /api/v1/glebas
 
-# Análise de Solo
+# Análise de Solo — química
+client.cadastrar_analise_solo_quimica(analise, chave_classificacao_nm=chave)
+client.atualizar_analise_solo_quimica(uuid, analise)
+client.buscar_analise_solo_quimica(uuid)
+client.listar_analises_solo_quimicas()
+
+# Análise de Solo — física
+client.cadastrar_analise_solo_fisica(analise, chave_classificacao_nm=chave)
+client.atualizar_analise_solo_fisica(uuid, analise)
+client.buscar_analise_solo_fisica(uuid)
+client.listar_analises_solo_fisicas()
+
+# Análise de Solo — payload combinado (só /api/v1; química + física juntas)
 client.cadastrar_analise_solo(analise, chave_classificacao_nm=chave)
-client.buscar_analise_solo(uuid)
 client.listar_analises_solo()
+client.buscar_analise_solo(uuid)                 # depreciado → use ..._quimica(uuid)
+
+# Análises disponíveis para um CPF (sempre /api/v1; traz uuidAnaliseSolo)
+client.consultar_analises_disponiveis(cpf)
+client.consultar_analises_disponiveis(cpf, data_referencia="2026-08-04")
 
 # Sensoriamento Remoto  (chave_classificacao_nm obrigatória)
 client.cadastrar_sensoriamento_remoto(sensoriamento, chave_classificacao_nm=chave)
+client.atualizar_sensoriamento_remoto(uuid, sensoriamento)
 client.buscar_sensoriamento_remoto(uuid)
 client.listar_sensoriamentos_remotos()
+client.remover_sensoriamento_remoto(uuid)
 
 # Classificação Nível de Manejo
 client.consultar_classificacao(chave)            # GET  /api/v1/classificacoes/{chave}
+client.consultar_racional(chave)                 # GET  .../{chave}/racional
 client.listar_classificacoes()                   # GET  /api/v1/classificacoes
 
 # Operação combinada (referencia recursos já cadastrados pelos UUIDs)
 client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 ```
+
+## Contrato v2 (opt-in)
+
+Por padrão o cliente fala `/api/v1`, o contrato estável — ele aceita os nomes
+canônicos **e** os legados, e nunca ganha campo obrigatório novo. Quem quiser o
+contrato limpo pede explicitamente:
+
+```python
+client = SINMClient(..., api_version="v2")
+client.api_version                               # "v2"
+```
+
+O que muda no `v2`:
+
+| | `v1` (default) | `v2` |
+|---|---|---|
+| Análise de solo | química, física **e** o payload combinado | só química e física — `cadastrar_analise_solo` levanta `ValueError` |
+| `cnpjLaboratorio` | opcional | **obrigatório** — o SDK valida antes de enviar (a API responde 400) |
+| Nomes legados (`cnpj`, `betaGlicosidade`) | aceitos e enviados junto | não enviados; se chegarem, a API os descarta em silêncio |
+
+O roteamento por versão vale para análise de solo e sensoriamento remoto.
+Gleba, operação, classificação e `analises-solo/disponiveis` seguem em `/api/v1`
+nos dois modos — não existe `v2` desses recursos.
+
+`betaGlicosidase` é a grafia canônica. A antiga `betaGlicosidade` (erro de
+grafia) ainda é aceita pelo dataclass, mas emite `DeprecationWarning`; informar
+as duas com valores diferentes é erro.
 
 ## Tratamento de erros
 
