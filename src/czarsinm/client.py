@@ -560,7 +560,7 @@ class SINMClient:
         - ``regraDeterminante`` (na classificação) — regra que fixou a nota:
           ``DOIS_OU_MAIS_NM1``, ``DOIS_OU_MAIS_NM2``, ``UM_NM1_UM_NM2``,
           ``SATURACAO_ALUMINIO_CRITICA``, ``SATURACAO_ALUMINIO_ALTA``,
-          ``SOJA_EM_SUCESSAO``, ``LEGUMINOSAS_EM_SUCESSAO``,
+          ``CULTURA_EM_SUCESSAO``, ``LEGUMINOSAS_EM_SUCESSAO``,
           ``DECLIVIDADE_ACENTUADA``, ``TETO_AMBIENTAL``, ou ``BANDA_DA_MEDIA``
           quando a nota veio mesmo da média.
         - ``limitantesPrincipais`` (na classificação) — nomes dos indicadores que
