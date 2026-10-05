@@ -25,7 +25,6 @@ from .models import (
     AnaliseSoloFisica,
     AnaliseSoloQuimica,
     DadoGleba,
-    DadosInput,
     SensoriamentoRemoto,
 )
 
@@ -40,15 +39,14 @@ API_URLS = {
 API_VERSIONS = ("v1", "v2")
 """Versões de contrato da API que o cliente sabe endereçar.
 
-O ``v2`` cobre apenas análise de solo (por tipo) e sensoriamento remoto — gleba,
-operação e classificação existem só no ``v1`` e continuam sendo chamadas lá.
+O ``v2`` cobre apenas análise de solo (por tipo) e sensoriamento remoto — gleba e
+classificação existem só no ``v1`` e continuam sendo chamadas lá.
 """
 
 # Roles exigidos por sufixo de endpoint, já sem o prefixo /api/vN
 # (ordem: mais específico primeiro)
 _ENDPOINT_ROLES = [
     ("/glebas",                    ["OPERADOR_CONTRATOS"]),
-    ("/operacoes",                 ["OPERADOR_CONTRATOS"]),
     ("/classificacoes",            ["OPERADOR_CONTRATOS",]),
     ("/analises-solo/disponiveis", ["OPERADOR_ANALISE_SOLO", "OPERADOR_CONTRATOS"]),
     ("/analises-solo",             ["OPERADOR_ANALISE_SOLO"]),
@@ -488,31 +486,6 @@ class SINMClient:
     def remover_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
         """Remove um sensoriamento remoto pelo UUID (204 → dict vazio)."""
         return self._delete(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
-
-    # ------------------------------------------------------------------
-    # Operação (fluxo combinado por UUIDs)
-    # ------------------------------------------------------------------
-
-    def cadastrar_operacao(self, dados: DadosInput) -> dict:
-        """
-        Executa a operação de classificação usando recursos já cadastrados.
-
-        Recebe os UUIDs de uma gleba, análise de solo e sensoriamento remoto
-        previamente registrados, junto com a produção atual e anteriores, e
-        dispara o processamento da classificação de nível de manejo.
-
-        Parameters
-        ----------
-        dados:
-            DadosInput com uuidGleba, uuidAnaliseSolo, uuidSensoriamentoRemoto,
-            producaoAtual e producoesAnteriores.
-
-        Returns
-        -------
-        dict
-            Resumo da operação (OperacaoNivelManejoResumoModel).
-        """
-        return self._post("/api/v1/operacoes", dados.to_dict())
 
     # ------------------------------------------------------------------
     # Classificação Nível de Manejo

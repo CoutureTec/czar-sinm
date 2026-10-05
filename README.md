@@ -221,9 +221,6 @@ client.remover_sensoriamento_remoto(uuid)
 client.consultar_classificacao(chave)            # GET  /api/v1/classificacoes/{chave}
 client.consultar_racional(chave)                 # GET  .../{chave}/racional
 client.listar_classificacoes()                   # GET  /api/v1/classificacoes
-
-# Operação combinada (referencia recursos já cadastrados pelos UUIDs)
-client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
 ```
 
 ## Contrato v2 (opt-in)

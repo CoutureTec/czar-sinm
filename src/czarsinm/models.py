@@ -223,38 +223,6 @@ class DadoGleba:
 
 
 # ---------------------------------------------------------------------------
-# Operação (fluxo combinado)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class DadosInput:
-    """
-    Payload para o endpoint POST /api/v1/operacoes.
-
-    Referencia recursos já cadastrados pelos seus UUIDs e fornece as
-    produções para disparar o processamento da classificação de NM.
-    """
-    uuidGleba: str
-    """UUID da gleba previamente cadastrada."""
-    uuidAnaliseSolo: str
-    """UUID da análise de solo previamente cadastrada."""
-    uuidSensoriamentoRemoto: str
-    """UUID do sensoriamento remoto previamente cadastrado."""
-    producaoAtual: Producao
-    """Produção da safra atual."""
-    producoesAnteriores: list
-
-    def to_dict(self) -> dict:
-        return {
-            "uuidGleba": self.uuidGleba,
-            "uuidAnaliseSolo": self.uuidAnaliseSolo,
-            "uuidSensoriamentoRemoto": self.uuidSensoriamentoRemoto,
-            "producaoAtual": self.producaoAtual.to_dict(),
-            "producoesAnteriores": [p.to_dict() for p in self.producoesAnteriores],
-        }
-
-
-# ---------------------------------------------------------------------------
 # Análise de Solo
 # ---------------------------------------------------------------------------
 

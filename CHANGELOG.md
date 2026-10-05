@@ -57,6 +57,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   nota *final*, então indicadores que causaram um teto saem como `NEUTRO`. Prefira
   `papelNaNota` + `contribuicao`.
 
+### Removido
+- `cadastrar_operacao` e o modelo `DadosInput`: a API não tem mais o fluxo combinado por
+  UUIDs. A classificação de nível de manejo sai do envio da gleba, da análise de solo e do
+  sensoriamento, e é consultada com `consultar_classificacao(chave)`.
+
 ## [0.3.0.rc2] — 2026-06-16
 
 ## [0.3.0.rc1] — 2026-06-16

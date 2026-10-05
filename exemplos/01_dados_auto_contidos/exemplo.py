@@ -31,7 +31,6 @@ from czarsinm import (
     AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
-    DadosInput,
 )
 from czarsinm.exceptions import SINMError, NotFoundError, APIError, PermissaoError
 
