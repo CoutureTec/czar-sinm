@@ -12,6 +12,9 @@ pode optar por salvar as credenciais em .env para as próximas execuções.
 Uso:
     python exemplo.py
 
+Versão da API em SINM_API_VERSION (v1 | v2, padrão v1). No cadastro de gleba o
+menu pergunta a cultura-alvo (soja ou milho).
+
 Credenciais via arquivo .env (cp ../env.example .env) — ou informe
 interativamente na inicialização.
 """
@@ -29,7 +32,7 @@ from dotenv import load_dotenv
 from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
-    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
+    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura, CulturaAlvo,
     AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
@@ -171,7 +174,12 @@ print(SEP)
 print("  SINM — Autenticando...")
 print(SEP)
 print(f"  Usuário : {USUARIO}")
+API_VERSION = os.getenv("SINM_API_VERSION", "v1").strip() or "v1"
+# Obrigatório no /api/v2 para análise de solo, se não vier em analise_solo.csv.
+CNPJ_LABORATORIO = os.getenv("SINM_CNPJ_LABORATORIO", "").strip() or CLIENT_ID
+
 print(f"  Ambiente: {AMBIENTE.upper()}")
+print(f"  API     : {API_VERSION}")
 print()
 
 client = SINMClient(
@@ -184,6 +192,7 @@ client = SINMClient(
     keycloak_url=KEYCLOAK_URL,
     keycloak_realm=KEYCLOAK_REALM,
     grant_type=GRANT_TYPE,
+    api_version=API_VERSION,
 )
 
 print("  Autenticado com sucesso!")
@@ -265,7 +274,26 @@ def _roles_cnpj(cnpj):
 # Leitores de entidades a partir dos CSVs (mesma estrutura do exemplo 02)
 # --------------------------------------------------------------------------
 
-def ler_dado_gleba(d):
+def ler_cultura_alvo(d, cultura=None):
+    """Cultura a classificar de talhao/cultura_alvo.csv; ``cultura`` sobrescreve soja/milho.
+
+    Sem o arquivo, a safra a classificar é a produção com previsão de plantio e
+    colheita em producoes.csv (forma do v1).
+    """
+    path = d / "talhao" / "cultura_alvo.csv"
+    if not path.exists():
+        return None
+    r = _csv(path)[0]
+    ilp_raw = r.get("ilp", "").strip()
+    return CulturaAlvo.de_nome(
+        cultura or r["cultura"],
+        r["data_previsao_plantio"],
+        r["data_previsao_colheita"],
+        ilp=_bool(ilp_raw) if ilp_raw else False,
+    )
+
+
+def ler_dado_gleba(d, cultura=None):
     row_p  = _csv(d / "talhao" / "produtor.csv")[0]
     row_pr = _csv(d / "talhao" / "propriedade.csv")[0]
     row_t  = _csv(d / "talhao" / "talhao.csv")[0]
@@ -314,6 +342,7 @@ def ler_dado_gleba(d):
         manejos=manejos,
         coberturas=coberturas,
         producoes=producoes,
+        culturaAlvo=ler_cultura_alvo(d, cultura),
     )
 
 
@@ -356,6 +385,7 @@ def ler_analise_solo(d):
     return AnaliseSolo(
         cpfProdutor=row["cpf_produtor"],
         cnpjPropriedade=row["cnpj"],
+        cnpjLaboratorio=row.get("cnpj_laboratorio") or CNPJ_LABORATORIO,
         amostrasQuimicas=amostras_quimicas,
         amostrasFisicas=amostras_fisicas,
     )
@@ -437,9 +467,13 @@ def acao_cadastrar_gleba():
     d = _pedir_diretorio()
     if not d:
         return
+    cultura = _pedir("Cultura-alvo [soja/milho, Enter=talhao/cultura_alvo.csv]").lower() or None
+    if cultura and cultura not in ("soja", "milho"):
+        print("  Cultura-alvo deve ser soja ou milho.")
+        return
     try:
         t0 = time.perf_counter()
-        resp = client.cadastrar_gleba(ler_dado_gleba(d))
+        resp = client.cadastrar_gleba(ler_dado_gleba(d, cultura))
         elapsed = time.perf_counter() - t0
         print()
         print("  Gleba cadastrada com sucesso!")
@@ -493,7 +527,18 @@ def acao_cadastrar_analise_solo():
         return
     try:
         t0 = time.perf_counter()
-        resp = client.cadastrar_analise_solo(ler_analise_solo(d), chave_classificacao_nm=chave)
+        analise = ler_analise_solo(d)
+        if API_VERSION == "v1":
+            # Payload combinado (química + física): só existe no /api/v1.
+            resp = client.cadastrar_analise_solo(analise, chave_classificacao_nm=chave)
+        else:
+            # No /api/v2 cada metade vai na sua rota.
+            quimica, fisica = analise.separar()
+            resp = {"quimica": client.cadastrar_analise_solo_quimica(
+                quimica, chave_classificacao_nm=chave)}
+            if fisica:
+                resp["fisica"] = client.cadastrar_analise_solo_fisica(
+                    fisica, chave_classificacao_nm=chave)
         elapsed = time.perf_counter() - t0
         print()
         print("  Análise de solo cadastrada com sucesso!")

@@ -38,7 +38,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   (`regraDeterminante`, `limitantesPrincipais`, `papelNaNota`, `contribuicao`), com os
   valores possíveis de cada enum.
 
+- **Gleba no contrato v2.** `cadastrar_gleba`, `buscar_gleba` e `listar_glebas` seguem
+  `api_version` (`/api/v2/glebas` no v2); novo `atualizar_gleba(uuid, dado)` (PUT).
+- `CulturaAlvo` (`soja`, `milho`, `de_nome`) e as constantes `CULTURA_SOJA`/`CULTURA_MILHO`;
+  campo `DadoGleba.culturaAlvo`. No v1 o alvo vai como última produção; no v2 vai em
+  `culturaAlvo`, obrigatório. Sem `culturaAlvo`, a produção com as duas previsões em
+  `producoes` é promovida a alvo.
+- Exemplos 01, 02 e 04: escolha da versão da API (`--api-version` / `SINM_API_VERSION`) e
+  da cultura-alvo soja ou milho (`--cultura` / `SINM_CULTURA_ALVO`; no 02 e no 04 também
+  `talhao/cultura_alvo.csv`). Novo conjunto `processo_002_milho` no exemplo 02.
+
 ### Alterado
+- Docstring de `Cultura`: os códigos de exemplo estavam errados ('018' não é milho). Agora:
+  '001' soja grão, '002' milho grão, '072' milho silagem, '085' trigo grão.
 - Payloads passam a enviar `cnpjPropriedade` (nome canônico) em vez da chave legada `cnpj`,
   em análise de solo e sensoriamento remoto. Todos os ambientes já aceitam a canônica.
 - Em `v1`, `betaGlicosidase` é enviado junto com o nome legado `betaGlicosidade`, porque os

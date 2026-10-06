@@ -1,7 +1,8 @@
 """
 Modelos de dados para os payloads da API SINM.
 Baseado nos tipos de input do sistema:
-  - DadoGlebaInput (produtor, propriedade, talhao, manejos, coberturas, producoes)
+  - DadoGlebaInput / DadoGlebaV2Input (produtor, propriedade, talhao, culturaAlvo,
+    manejos, coberturas, producoes)
   - AnaliseSoloInput / AnaliseSoloQuimicaInput / AnaliseSoloFisicaInput
   - MonitoramentoSateliteInput (sensoriamento remoto)
 
@@ -18,6 +19,11 @@ parâmetro ``contrato`` (``'v1'``, o padrão, ou ``'v2'``):
 - **v2** — contrato limpo (estreia em homologação em 04/08/2026): só nomes
   canônicos e ``cnpjLaboratorio`` obrigatório. Nome legado enviado ao v2 é
   descartado **em silêncio**, sem erro — por isso os modelos nunca os emitem no v2.
+  Na gleba, a cultura a classificar é declarada em ``culturaAlvo`` (soja ou milho
+  grão) em vez de inferida da produção com previsão de plantio e colheita.
+
+Um mesmo :class:`DadoGleba` serializa para os dois contratos: ver
+:meth:`DadoGleba.to_dict`.
 """
 
 from __future__ import annotations
@@ -154,10 +160,22 @@ class CoberturaSolo:
         return asdict(self)
 
 
+CULTURA_SOJA = "001"
+"""Código de Soja (grão) — cultura-alvo de classificação."""
+
+CULTURA_MILHO = "002"
+"""Código de Milho (grão) — cultura-alvo de classificação."""
+
+CULTURAS_ALVO = {"soja": CULTURA_SOJA, "milho": CULTURA_MILHO}
+"""Culturas para as quais o nível de manejo é calculado, por nome → código."""
+
+
 @dataclass
 class Cultura:
     codigo: str
-    """Código da cultura. Ex: '001' (soja), '018' (milho), '020' (sorgo), '072' (trigo)."""
+    """Código da cultura (3 dígitos). Ex.: '001' Soja (grão), '002' Milho (grão),
+    '072' Milho (silagem/feno), '085' Trigo (grão), '020' Aveia preta (cobertura do
+    solo). Lista completa em GET /api/v1/culturas."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -195,11 +213,93 @@ class Producao:
 
 
 @dataclass
+class CulturaAlvo:
+    """Cultura para a qual o nível de manejo será calculado (``CulturaAlvoInput``).
+
+    Só soja grão (``'001'``) e milho grão (``'002'``) são alvo de classificação.
+    Use os construtores :meth:`soja` e :meth:`milho`, ou :meth:`de_nome` quando a
+    cultura vier de configuração::
+
+        CulturaAlvo.milho("2026-10-01", "2027-02-15")
+        CulturaAlvo.de_nome("soja", "2026-10-01", "2027-01-10")
+    """
+    cultura: Cultura
+    dataPrevisaoPlantio: str
+    """Data prevista de plantio (formato 'YYYY-MM-DD')."""
+    dataPrevisaoColheita: str
+    """Data prevista de colheita (formato 'YYYY-MM-DD')."""
+    ilp: bool = False
+    """Integração Lavoura-Pecuária."""
+
+    def __post_init__(self) -> None:
+        if self.cultura.codigo not in CULTURAS_ALVO.values():
+            raise ValueError(
+                f"Cultura-alvo '{self.cultura.codigo}' não é alvo de classificação. "
+                f"Use soja grão ({CULTURA_SOJA}) ou milho grão ({CULTURA_MILHO})."
+            )
+
+    @classmethod
+    def soja(cls, data_previsao_plantio: str, data_previsao_colheita: str, ilp: bool = False) -> "CulturaAlvo":
+        """Soja (grão) como cultura-alvo."""
+        return cls(Cultura(CULTURA_SOJA), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    @classmethod
+    def milho(cls, data_previsao_plantio: str, data_previsao_colheita: str, ilp: bool = False) -> "CulturaAlvo":
+        """Milho (grão) como cultura-alvo."""
+        return cls(Cultura(CULTURA_MILHO), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    @classmethod
+    def de_nome(cls, nome: str, data_previsao_plantio: str, data_previsao_colheita: str,
+                ilp: bool = False) -> "CulturaAlvo":
+        """Cultura-alvo pelo nome (``'soja'`` ou ``'milho'``, sem distinção de caixa)."""
+        codigo = CULTURAS_ALVO.get(nome.strip().lower())
+        if codigo is None:
+            raise ValueError(
+                f"Cultura-alvo '{nome}' não reconhecida. Use uma de: {', '.join(CULTURAS_ALVO)}."
+            )
+        return cls(Cultura(codigo), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    def como_producao(self) -> Producao:
+        """A cultura-alvo na forma do v1: a produção com previsão de plantio e colheita."""
+        return Producao(
+            cultura=self.cultura,
+            ilp=self.ilp,
+            dataPrevisaoPlantio=self.dataPrevisaoPlantio,
+            dataPrevisaoColheita=self.dataPrevisaoColheita,
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "cultura": self.cultura.to_dict(),
+            "dataPrevisaoPlantio": self.dataPrevisaoPlantio,
+            "dataPrevisaoColheita": self.dataPrevisaoColheita,
+            "ilp": self.ilp,
+        }
+
+
+def _eh_producao_atual(p: Producao) -> bool:
+    """Produção com as duas previsões — é o que a API lê como cultura-alvo no v1."""
+    return bool(p.dataPrevisaoPlantio and p.dataPrevisaoColheita)
+
+
+@dataclass
 class DadoGleba:
     """
     Payload completo para cadastro de talhão/gleba.
 
-    Corresponde ao DadoGlebaInput da API.
+    Corresponde ao ``DadoGlebaInput`` (v1) e ao ``DadoGlebaV2Input`` (v2) da API.
+    A diferença entre os contratos é onde a cultura a classificar é declarada:
+
+    - **v1** — inferida: é a única produção com ``dataPrevisaoPlantio`` e
+      ``dataPrevisaoColheita``. Cultura fora de soja/milho grão cai em soja e a API
+      registra inconsistência.
+    - **v2** — campo próprio ``culturaAlvo``; ``producoes`` é só histórico.
+      Cultura fora de soja/milho grão é recusada com 400.
+
+    Informe ``culturaAlvo`` e mantenha em ``producoes`` só o histórico: o mesmo
+    objeto serializa corretamente para os dois contratos (no v1 a cultura-alvo
+    vira a produção atual, no fim da lista). Sem ``culturaAlvo``, a produção atual
+    em ``producoes`` é promovida a cultura-alvo no v2.
     """
     produtor: Produtor
     propriedade: Propriedade
@@ -209,17 +309,57 @@ class DadoGleba:
     coberturas: list[CoberturaSolo]
     """Mínimo 1 avaliação de cobertura obrigatória."""
     producoes: list[Producao]
-    """Mínimo 1 produção (passada ou futura) obrigatória."""
+    """Histórico de cultivos (mínimo 1). Sem ``culturaAlvo``, deve conter também a
+    produção atual (com as duas previsões) — forma do v1."""
+    culturaAlvo: Optional[CulturaAlvo] = None
+    """Cultura a classificar: soja ou milho grão. Ver :class:`CulturaAlvo`."""
 
-    def to_dict(self) -> dict:
-        return {
+    def _historico_e_alvo(self) -> tuple[list[Producao], Optional[CulturaAlvo]]:
+        atuais = [p for p in self.producoes if _eh_producao_atual(p)]
+        if self.culturaAlvo is not None:
+            if atuais:
+                raise ValueError(
+                    "Com culturaAlvo informada, producoes deve conter só o histórico: "
+                    "remova a produção com dataPrevisaoPlantio e dataPrevisaoColheita."
+                )
+            return list(self.producoes), self.culturaAlvo
+        if len(atuais) != 1:
+            return list(self.producoes), None
+        atual = atuais[0]
+        historico = [p for p in self.producoes if p is not atual]
+        return historico, CulturaAlvo(
+            cultura=atual.cultura,
+            dataPrevisaoPlantio=atual.dataPrevisaoPlantio,
+            dataPrevisaoColheita=atual.dataPrevisaoColheita,
+            ilp=atual.ilp,
+        )
+
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        d = {
             "produtor": self.produtor.to_dict(),
             "propriedade": self.propriedade.to_dict(),
             "talhao": self.talhao.to_dict(),
             "manejos": [m.to_dict() for m in self.manejos],
             "coberturas": [c.to_dict() for c in self.coberturas],
-            "producoes": [p.to_dict() for p in self.producoes],
         }
+        if contrato == "v1":
+            producoes = list(self.producoes)
+            if self.culturaAlvo is not None:
+                self._historico_e_alvo()  # recusa alvo declarado duas vezes
+                producoes.append(self.culturaAlvo.como_producao())
+            d["producoes"] = [p.to_dict() for p in producoes]
+            return d
+
+        historico, alvo = self._historico_e_alvo()
+        if alvo is None:
+            raise ValueError(
+                "O contrato v2 exige culturaAlvo (soja ou milho grão). Informe "
+                "DadoGleba(culturaAlvo=CulturaAlvo.soja(...)) ou CulturaAlvo.milho(...)."
+            )
+        d["culturaAlvo"] = alvo.to_dict()
+        d["producoes"] = [p.to_dict() for p in historico]
+        return d
 
 
 # ---------------------------------------------------------------------------

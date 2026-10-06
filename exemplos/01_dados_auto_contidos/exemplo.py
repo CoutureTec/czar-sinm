@@ -11,7 +11,11 @@ Uso:
     python example.py --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
     python example.py --acao consultaClassificacaoNM  --chave_nm CHAVE
 
-Credenciais via arquivo .env (cp .env.example .env).
+    python example.py --cultura milho                          # cultura-alvo milho
+    python example.py --api-version v2                         # contrato /api/v2
+
+Credenciais via arquivo .env (cp .env.example .env). A versão da API e a
+cultura-alvo também podem vir do .env (SINM_API_VERSION, SINM_CULTURA_ALVO).
 """
 
 import argparse
@@ -27,7 +31,7 @@ load_dotenv()
 from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
-    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
+    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura, CulturaAlvo,
     AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
@@ -72,10 +76,24 @@ parser.add_argument(
     metavar="CHAVE",
     help="Chave de classificação NM retornada no cadastro da gleba.",
 )
+parser.add_argument(
+    "--api-version",
+    choices=("v1", "v2"),
+    default=os.getenv("SINM_API_VERSION", "v1"),
+    help="Contrato da API (padrão: SINM_API_VERSION ou v1).",
+)
+parser.add_argument(
+    "--cultura",
+    choices=("soja", "milho"),
+    default=os.getenv("SINM_CULTURA_ALVO", "soja"),
+    help="Cultura-alvo da classificação (padrão: SINM_CULTURA_ALVO ou soja).",
+)
 args = parser.parse_args()
 
 ACAO = args.acao
 CHAVE_NM = args.chave_nm
+API_VERSION = args.api_version
+CULTURA_ALVO = args.cultura
 
 # Valida dependências
 if ACAO in ("cadastraAnaliseSolo", "cadastraSensoriamentoRemoto", "consultaClassificacaoNM"):
@@ -103,6 +121,8 @@ BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
 KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
 KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
 GRANT_TYPE     = os.getenv("SINM_GRANT_TYPE") or None
+# Obrigatório no /api/v2 para análise de solo; no v1 a API infere o laboratório.
+CNPJ_LABORATORIO = os.getenv("SINM_CNPJ_LABORATORIO") or CLIENT_ID
 
 # --------------------------------------------------------------------------
 # Client
@@ -117,11 +137,26 @@ client = SINMClient(
     keycloak_url=KEYCLOAK_URL,
     keycloak_realm=KEYCLOAK_REALM,
     grant_type=GRANT_TYPE,
+    api_version=API_VERSION,
 )
 
 # --------------------------------------------------------------------------
 # Payloads de exemplo (reutilizados pelas funções abaixo)
 # --------------------------------------------------------------------------
+
+# Previsão de plantio e colheita da safra a classificar, por cultura-alvo.
+_PREVISOES = {
+    "soja":  ("2026-10-01", "2027-01-10"),
+    "milho": ("2026-10-01", "2027-02-20"),
+}
+
+
+def _cultura_alvo() -> CulturaAlvo:
+    """Cultura para a qual o nível de manejo será calculado: soja ou milho (grão)."""
+    plantio, colheita = _PREVISOES[CULTURA_ALVO]
+    return CulturaAlvo.de_nome(CULTURA_ALVO, plantio, colheita)
+    # Equivalente: CulturaAlvo.soja(plantio, colheita) ou CulturaAlvo.milho(plantio, colheita)
+
 
 def _dado_gleba() -> DadoGleba:
     return DadoGleba(
@@ -171,18 +206,18 @@ def _dado_gleba() -> DadoGleba:
             CoberturaSolo(dataAvaliacao="2024-01-01", porcentualPalhada=55),
             CoberturaSolo(dataAvaliacao="2025-01-01", porcentualPalhada=60),
         ],
+        # Histórico de cultivos (usado nos critérios de sucessão)
         producoes=[
-            Producao(cultura=Cultura(codigo="001"), ilp=False,
+            Producao(cultura=Cultura(codigo="001"), ilp=False,   # Soja (grão)
                      dataPlantio="2022-10-01", dataColheita="2023-01-10"),
-            Producao(cultura=Cultura(codigo="018"), ilp=False,
+            Producao(cultura=Cultura(codigo="018"), ilp=False,   # Aveia preta (silagem/feno)
                      dataPlantio="2023-02-21", dataColheita="2023-08-01"),
-            Producao(cultura=Cultura(codigo="001"), ilp=False,
+            Producao(cultura=Cultura(codigo="001"), ilp=False,   # Soja (grão)
                      dataPlantio="2024-10-01", dataColheita="2025-01-10"),
-            # Safra futura (obrigatória)
-            Producao(cultura=Cultura(codigo="001"),
-                     dataPrevisaoPlantio="2026-10-01",
-                     dataPrevisaoColheita="2027-01-10"),
         ],
+        # Safra a classificar. No v1 o SDK a envia como a produção com previsão
+        # de plantio e colheita; no v2, no campo culturaAlvo.
+        culturaAlvo=_cultura_alvo(),
     )
 
 
@@ -190,6 +225,7 @@ def _analise_solo() -> AnaliseSolo:
     return AnaliseSolo(
         cpfProdutor="68122528082",
         cnpjPropriedade="54194116000138",
+        cnpjLaboratorio=CNPJ_LABORATORIO,
         amostrasQuimicas=[
             Amostra(
                 cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
@@ -297,6 +333,7 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
 
 def autenticacao() -> None:
     print("\n=== Autenticação ===")
+    print(f"API         : {API_VERSION}  |  Cultura-alvo: {CULTURA_ALVO}")
     roles        = client.roles
     client_roles = client.client_roles
     print(f"Usuário     : {USUARIO}")
@@ -371,10 +408,21 @@ def cadastra_analise_solo(chave_nm: str) -> None:
     print("\n=== Cadastrando análise de solo ===")
     try:
         t0 = time.perf_counter()
-        resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
+        if API_VERSION == "v1":
+            # Payload combinado (química + física): só existe no /api/v1.
+            resp = client.cadastrar_analise_solo(_analise_solo(), chave_classificacao_nm=chave_nm)
+            uuids = [resp.get("uuidAnaliseSolo")]
+        else:
+            # No /api/v2 cada metade vai na sua rota.
+            quimica, fisica = _analise_solo().separar()
+            uuids = [client.cadastrar_analise_solo_quimica(
+                quimica, chave_classificacao_nm=chave_nm).get("uuidAnaliseSolo")]
+            if fisica:
+                uuids.append(client.cadastrar_analise_solo_fisica(
+                    fisica, chave_classificacao_nm=chave_nm).get("uuidAnaliseSolo"))
         elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
-        print(f"  UUID: {resp.get('uuidAnaliseSolo')}")
+        print(f"  UUID: {', '.join(str(u) for u in uuids)}")
         print(f"  Tempo: {elapsed:.2f}s")
     except PermissaoError as exc:
         print(exc.format_report(), file=sys.stderr)

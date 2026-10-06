@@ -11,6 +11,7 @@ from czarsinm import (
     AnaliseSoloQuimica,
     CoberturaSolo,
     Cultura,
+    CulturaAlvo,
     DadoGleba,
     Indice,
     InterpretacaoCoberturaSolo,
@@ -441,3 +442,81 @@ class TestSensoriamentoRemoto:
         assert d["interpretacoesCoberturaSolo"] == []
         assert d["interpretacoesCultura"] == []
         assert d["interpretacoesManejo"] == []
+
+
+# ---------------------------------------------------------------------------
+# Cultura-alvo e DadoGleba nos contratos v1/v2
+# ---------------------------------------------------------------------------
+
+class TestCulturaAlvo:
+    def test_construtores(self):
+        assert CulturaAlvo.soja("2026-10-01", "2027-01-10").cultura.codigo == "001"
+        assert CulturaAlvo.milho("2026-10-01", "2027-02-15").cultura.codigo == "002"
+        assert CulturaAlvo.de_nome(" Milho ", "2026-10-01", "2027-02-15").cultura.codigo == "002"
+
+    def test_nome_desconhecido(self):
+        with pytest.raises(ValueError, match="não reconhecida"):
+            CulturaAlvo.de_nome("trigo", "2026-10-01", "2027-01-10")
+
+    def test_codigo_fora_do_alvo(self):
+        with pytest.raises(ValueError, match="não é alvo"):
+            CulturaAlvo(Cultura("072"), "2026-10-01", "2027-01-10")
+
+    def test_to_dict(self):
+        d = CulturaAlvo.milho("2026-10-01", "2027-02-15", ilp=True).to_dict()
+        assert d == {
+            "cultura": {"codigo": "002"},
+            "dataPrevisaoPlantio": "2026-10-01",
+            "dataPrevisaoColheita": "2027-02-15",
+            "ilp": True,
+        }
+
+
+class TestDadoGlebaContratos:
+    @pytest.fixture
+    def gleba_milho(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada]
+        dado_gleba.culturaAlvo = CulturaAlvo.milho("2026-10-01", "2027-02-15")
+        return dado_gleba
+
+    def test_v1_sem_cultura_alvo_inalterado(self, dado_gleba):
+        d = dado_gleba.to_dict()
+        assert "culturaAlvo" not in d
+        assert len(d["producoes"]) == len(dado_gleba.producoes)
+
+    def test_v1_cultura_alvo_vira_producao_atual(self, gleba_milho):
+        d = gleba_milho.to_dict("v1")
+        assert "culturaAlvo" not in d
+        atual = d["producoes"][-1]
+        assert atual["cultura"] == {"codigo": "002"}
+        assert atual["dataPrevisaoPlantio"] == "2026-10-01"
+        assert atual["dataPrevisaoColheita"] == "2027-02-15"
+
+    def test_v2_cultura_alvo_declarada(self, gleba_milho):
+        d = gleba_milho.to_dict("v2")
+        assert d["culturaAlvo"]["cultura"] == {"codigo": "002"}
+        assert len(d["producoes"]) == 1
+        assert "dataPrevisaoPlantio" not in d["producoes"][0]
+
+    def test_v2_promove_producao_atual(self, dado_gleba):
+        d = dado_gleba.to_dict("v2")
+        assert d["culturaAlvo"]["cultura"] == {"codigo": "001"}
+        assert d["culturaAlvo"]["dataPrevisaoPlantio"] == "2026-10-01"
+        assert all("dataPrevisaoPlantio" not in p for p in d["producoes"])
+
+    def test_v2_sem_alvo_falha(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada]
+        with pytest.raises(ValueError, match="exige culturaAlvo"):
+            dado_gleba.to_dict("v2")
+
+    def test_v2_producao_atual_fora_do_alvo_falha(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada, Producao(
+            cultura=Cultura("085"), dataPrevisaoPlantio="2026-05-01", dataPrevisaoColheita="2026-09-01")]
+        with pytest.raises(ValueError, match="não é alvo"):
+            dado_gleba.to_dict("v2")
+
+    @pytest.mark.parametrize("contrato", ["v1", "v2"])
+    def test_alvo_declarado_duas_vezes_falha(self, dado_gleba, contrato):
+        dado_gleba.culturaAlvo = CulturaAlvo.soja("2026-10-01", "2027-01-10")
+        with pytest.raises(ValueError, match="só o histórico"):
+            dado_gleba.to_dict(contrato)

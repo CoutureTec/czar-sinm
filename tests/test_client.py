@@ -320,11 +320,30 @@ class TestApiVersionV2:
         assert "/api/v2/sensoriamentos-remotos/CHAVE001" in rsps_lib.calls[0].request.url
 
     @rsps_lib.activate
-    def test_gleba_permanece_no_v1(self, client_v2, dado_gleba):
-        """Gleba, operação e classificação não têm v2."""
-        rsps_lib.add(rsps_lib.POST, f"{BASE}/api/v1/glebas", json={}, status=201)
+    def test_gleba_vai_para_a_rota_v2_com_cultura_alvo(self, client_v2, dado_gleba):
+        rsps_lib.add(rsps_lib.POST, f"{BASE}/api/v2/glebas", json={}, status=201)
         client_v2.cadastrar_gleba(dado_gleba)
-        assert "/api/v1/glebas" in rsps_lib.calls[0].request.url
+        assert rsps_lib.calls[0].request.url.endswith("/api/v2/glebas")
+        body = json.loads(rsps_lib.calls[0].request.body)
+        assert body["culturaAlvo"]["cultura"]["codigo"] == "001"
+        assert all("dataPrevisaoPlantio" not in p for p in body["producoes"])
+
+    @rsps_lib.activate
+    def test_atualizar_buscar_listar_gleba_no_v2(self, client_v2, dado_gleba):
+        rsps_lib.add(rsps_lib.PUT, f"{BASE}/api/v2/glebas/U1", json={}, status=200)
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v2/glebas/U1", json={}, status=200)
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v2/glebas", json=[], status=200)
+        client_v2.atualizar_gleba("U1", dado_gleba)
+        client_v2.buscar_gleba("U1")
+        client_v2.listar_glebas()
+        assert [c.request.method for c in rsps_lib.calls] == ["PUT", "GET", "GET"]
+        assert all("/api/v2/glebas" in c.request.url for c in rsps_lib.calls)
+
+    @rsps_lib.activate
+    def test_classificacao_permanece_no_v1(self, client_v2):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/classificacoes/CH", json={}, status=200)
+        client_v2.consultar_classificacao("CH")
+        assert "/api/v1/classificacoes/CH" in rsps_lib.calls[0].request.url
 
     @rsps_lib.activate
     def test_disponiveis_permanece_no_v1(self, client_v2):

@@ -39,8 +39,9 @@ API_URLS = {
 API_VERSIONS = ("v1", "v2")
 """Versões de contrato da API que o cliente sabe endereçar.
 
-O ``v2`` cobre apenas análise de solo (por tipo) e sensoriamento remoto — gleba e
-classificação existem só no ``v1`` e continuam sendo chamadas lá.
+O ``v2`` cobre gleba (com ``culturaAlvo`` declarada), análise de solo (por tipo) e
+sensoriamento remoto. Classificação e análises disponíveis existem só no ``v1`` e
+continuam sendo chamadas lá, qualquer que seja a versão configurada.
 """
 
 # Roles exigidos por sufixo de endpoint, já sem o prefixo /api/vN
@@ -164,12 +165,15 @@ class SINMClient:
         timeout:
             Timeout em segundos para chamadas à API.
         api_version:
-            Contrato da API para análise de solo e sensoriamento remoto: 'v1'
-            (padrão, contrato congelado — aceita os nomes legados) ou 'v2'
-            (contrato limpo: só nomes canônicos e ``cnpjLaboratorio``
-            obrigatório). O v2 estreia em homologação em 04/08/2026; em produção,
-            na entrega seguinte. Gleba, operação e classificação não têm v2 e são
-            sempre chamadas no /api/v1.
+            Contrato da API para gleba, análise de solo e sensoriamento remoto:
+            'v1' (padrão, contrato congelado — aceita os nomes legados e infere a
+            cultura-alvo da produção atual) ou 'v2' (contrato limpo: só nomes
+            canônicos, ``cnpjLaboratorio`` obrigatório e ``culturaAlvo`` declarada
+            na gleba). Classificação e análises disponíveis não têm v2 e são
+            sempre chamadas no /api/v1. Os modelos serializam para os dois
+            contratos, então trocar a versão não exige mudar o código que monta
+            os payloads — exceto o cadastro combinado de análise de solo, que só
+            existe no v1.
         """
         if ambiente not in API_URLS and base_url is None:
             raise ValueError(
@@ -201,7 +205,7 @@ class SINMClient:
 
     @property
     def api_version(self) -> str:
-        """Contrato usado nas rotas de análise de solo e sensoriamento ('v1' ou 'v2')."""
+        """Contrato usado nas rotas de gleba, análise de solo e sensoriamento ('v1' ou 'v2')."""
         return self._api_version
 
     def _rota(self, recurso: str) -> str:
@@ -227,7 +231,11 @@ class SINMClient:
 
     def cadastrar_gleba(self, dado: DadoGleba) -> dict:
         """
-        Cadastra um talhão/gleba na API.
+        Cadastra um talhão/gleba na API, na versão configurada.
+
+        No ``v2`` a cultura a classificar vai em ``culturaAlvo`` (soja ou milho
+        grão); no ``v1`` ela é a produção com previsão de plantio e colheita. O
+        modelo converte entre as duas formas — ver :class:`DadoGleba`.
 
         Returns
         -------
@@ -237,20 +245,28 @@ class SINMClient:
 
         Raises
         ------
+        ValueError
+            No ``v2``, se a gleba não tiver cultura-alvo — antes da chamada.
         ValidationError
-            Se o payload enviado contiver dados inválidos (HTTP 400/422).
+            Se o payload enviado contiver dados inválidos (HTTP 400/422). No
+            ``v2`` também quando a operadora é incoerente (422), caso em que o
+            ``v1`` grava e sinaliza ``RN23``.
         APIError
             Para outros erros HTTP.
         """
-        return self._post("/api/v1/glebas", dado.to_dict())
+        return self._post(self._rota("/glebas"), dado.to_dict(self._api_version))
+
+    def atualizar_gleba(self, uuid_gleba: str, dado: DadoGleba) -> dict:
+        """Substitui os dados de uma gleba já cadastrada, na versão configurada."""
+        return self._put(f"{self._rota('/glebas')}/{uuid_gleba}", dado.to_dict(self._api_version))
 
     def buscar_gleba(self, uuid_gleba: str) -> dict:
         """Busca os dados de uma gleba pelo UUID."""
-        return self._get(f"/api/v1/glebas/{uuid_gleba}")
+        return self._get(f"{self._rota('/glebas')}/{uuid_gleba}")
 
     def listar_glebas(self) -> list:
         """Lista as glebas do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/glebas"))
+        return _extrair_lista(self._get(self._rota("/glebas")))
 
     # ------------------------------------------------------------------
     # Análise de Solo

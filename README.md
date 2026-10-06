@@ -242,9 +242,33 @@ O que muda no `v2`:
 | `cnpjLaboratorio` | opcional | **obrigatório** — o SDK valida antes de enviar (a API responde 400) |
 | Nomes legados (`cnpj`, `betaGlicosidade`) | aceitos e enviados junto | não enviados; se chegarem, a API os descarta em silêncio |
 
-O roteamento por versão vale para análise de solo e sensoriamento remoto.
-Gleba, operação, classificação e `analises-solo/disponiveis` seguem em `/api/v1`
-nos dois modos — não existe `v2` desses recursos.
+| Gleba | safra a classificar como uma produção de `producoes` com as duas previsões | `culturaAlvo` obrigatório; `producoes` leva só o histórico |
+
+O roteamento por versão vale para gleba, análise de solo e sensoriamento remoto.
+Classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois modos —
+não existe `v2` desses recursos.
+
+### Cultura-alvo (soja ou milho)
+
+A safra que será classificada é declarada com `CulturaAlvo` — só soja (`001`)
+e milho (`002`) são cultura-alvo:
+
+```python
+from czarsinm import CulturaAlvo, DadoGleba
+
+alvo = CulturaAlvo.soja("2026-10-01", "2027-01-10")          # ou CulturaAlvo.milho(...)
+alvo = CulturaAlvo.de_nome("milho", "2026-10-01", "2027-02-20", ilp=False)
+
+dado = DadoGleba(..., producoes=historico, culturaAlvo=alvo)
+client.cadastrar_gleba(dado)               # v1 ou v2
+client.atualizar_gleba(uuid_gleba, dado)   # PUT
+```
+
+O mesmo `DadoGleba` serve aos dois contratos: no `v1` o SDK envia o alvo como
+a última produção de `producoes`; no `v2` envia `culturaAlvo` e só o histórico.
+Código antigo que põe a safra futura em `producoes` (sem `culturaAlvo`) continua
+funcionando nos dois — essa produção é promovida a alvo. Declarar `culturaAlvo`
+**e** uma produção com as duas previsões é erro.
 
 `betaGlicosidase` é a grafia canônica. A antiga `betaGlicosidade` (erro de
 grafia) ainda é aceita pelo dataclass, mas emite `DeprecationWarning`; informar
