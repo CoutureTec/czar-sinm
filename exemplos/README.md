@@ -1,6 +1,10 @@
 # Exemplos
 
-Aqui há exemplos de códigos python que usam a lib cliente. 
+Aqui há exemplos de códigos python que usam a lib cliente.
+
+Os exemplos 01, 02 e 04 falam `/api/v1` ou `/api/v2` (`SINM_API_VERSION`) e
+cadastram a gleba com cultura-alvo **soja** ou **milho** (`SINM_CULTURA_ALVO`
+ou `--cultura`). Veja `env.example`.
 
 ## [dados_auto_contidos](dados_auto_contidos/)
 

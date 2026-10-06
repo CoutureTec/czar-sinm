@@ -23,6 +23,13 @@ python exemplo.py
 
 Não há argumentos de linha de comando. Tudo é feito de forma interativa.
 
+A versão da API vem de `SINM_API_VERSION` (`v1` | `v2`, padrão `v1`). No
+cadastro de gleba o menu pergunta a cultura-alvo (`soja` ou `milho`); com Enter
+vale `talhao/cultura_alvo.csv` do diretório informado (mesmo formato do exemplo
+02). No `v2` a análise de solo é enviada em duas chamadas (química e física),
+com `cnpjLaboratorio` da coluna `cnpj_laboratorio` ou de `SINM_CNPJ_LABORATORIO`
+(padrão `SINM_CLIENT_ID`).
+
 ---
 
 ## Credenciais
