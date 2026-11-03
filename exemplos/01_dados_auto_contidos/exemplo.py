@@ -23,7 +23,7 @@ import logging
 import os
 import sys
 import time
-from datetime import date
+from datetime import date, timedelta
 
 from dotenv import load_dotenv
 
@@ -163,6 +163,13 @@ def _d(iso: str) -> str:
     return f"{int(iso[:4]) + _DESLOCAMENTO_ANOS}{iso[4:]}"
 
 
+# A coleta das amostras é recente (dois dias atrás): a API recusa associar uma
+# análise quando o mesmo produtor já tem outra, no mesmo polígono, coletada
+# depois dela e antes do plantio — e o ambiente de homologação acumula envios.
+_COLETA = (date.today() - timedelta(days=2)).isoformat()
+_COLETA_SEGUINTE = (date.today() - timedelta(days=1)).isoformat()
+
+
 # Previsão de plantio e colheita da safra a classificar, por cultura-alvo.
 _PREVISOES = {
     "soja":  (_d("2026-10-01"), _d("2027-01-10")),
@@ -247,28 +254,28 @@ def _analise_solo() -> AnaliseSolo:
         cnpjLaboratorio=CNPJ_LABORATORIO,
         amostrasQuimicas=[
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.108493, latitude=-22.811532, camada="00_020",
                 calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
                 aluminio=0.36, acidezPotencial=5.0,
                 phh2o=5.4, fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.106733, latitude=-22.812530, camada="00_020",
                 calcio=0.8, magnesio=0.7, potassio=59.2, sodio=5.9,
                 aluminio=0.36, acidezPotencial=4.4,
                 phh2o=5.5, fosforoMehlich=1.2, enxofre=7.3, mos=12.6,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.103408, latitude=-22.812253, camada="20_040",
                 calcio=0.5, magnesio=1.1, potassio=42.9, sodio=7.9,
                 aluminio=1.215, acidezPotencial=5.2,
                 phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-18"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA_SEGUINTE,
                 longitude=-47.103418, latitude=-22.812263, camada="20_040",
                 calcio=0.5, magnesio=1.2, potassio=42.9, sodio=7.9,
                 aluminio=1.215, acidezPotencial=5.2,
@@ -277,22 +284,22 @@ def _analise_solo() -> AnaliseSolo:
         ],
         amostrasFisicas=[
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.108493, latitude=-22.811532, camada="00_020",
                 areia=78.0, silte=5.0, argila=17.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.106733, latitude=-22.812530, camada="00_020",
                 areia=75.0, silte=6.0, argila=19.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.103408, latitude=-22.812253, camada="20_040",
                 areia=71.0, silte=7.0, argila=22.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
+                cpfResponsavelColeta="21750077078", dataColeta=_COLETA,
                 longitude=-47.103418, latitude=-22.811531, camada="20_040",
                 areia=71.0, silte=8.0, argila=22.0,
             ),
