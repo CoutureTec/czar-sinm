@@ -4,9 +4,14 @@ import pytest
 
 from czarsinm import (
     Amostra,
+    AmostraFisica,
+    AmostraQuimica,
     AnaliseSolo,
+    AnaliseSoloFisica,
+    AnaliseSoloQuimica,
     CoberturaSolo,
     Cultura,
+    CulturaAlvo,
     DadoGleba,
     Indice,
     InterpretacaoCoberturaSolo,
@@ -187,36 +192,158 @@ class TestAmostra:
         amostra.phcacl2 = 5.1
         amostra.fosforoResina = 2.3
         amostra.arilsulfatase = 100.0
-        amostra.betaGlicosidade = 50.0
+        amostra.betaGlicosidase = 50.0
         amostra.densidadeSolo = 1.2
         d = amostra.to_dict()
         assert d["phcacl2"] == 5.1
         assert d["fosforoResina"] == 2.3
         assert d["arilsulfatase"] == 100.0
-        assert d["betaGlicosidade"] == 50.0
         assert d["densidadeSolo"] == 1.2
 
 
 # ---------------------------------------------------------------------------
-# AnaliseSolo
+# AmostraQuimica — grafia da beta-glicosidase (#261 / v6.2026)
+# ---------------------------------------------------------------------------
+
+class TestBetaGlicosidase:
+    def _amostra(self, **kwargs):
+        base = dict(
+            cpfResponsavelColeta="21750077078",
+            dataColeta="2024-09-17",
+            longitude=-47.1,
+            latitude=-22.8,
+            camada="00_020",
+            calcio=0.9, magnesio=0.8, potassio=59.9,
+            aluminio=0.36, acidezPotencial=5.0, enxofre=6.4, mos=10.8,
+        )
+        base.update(kwargs)
+        return AmostraQuimica(**base)
+
+    def test_v1_envia_as_duas_grafias(self):
+        """O v1 leva canônica + legada: a produção ainda só conhece a legada."""
+        d = self._amostra(betaGlicosidase=50.0).to_dict("v1")
+        assert d["betaGlicosidase"] == 50.0
+        assert d["betaGlicosidade"] == 50.0
+
+    def test_v2_envia_apenas_a_canonica(self):
+        d = self._amostra(betaGlicosidase=50.0).to_dict("v2")
+        assert d["betaGlicosidase"] == 50.0
+        assert "betaGlicosidade" not in d
+
+    def test_grafia_legada_alimenta_a_canonica_com_aviso(self):
+        with pytest.deprecated_call():
+            amostra = self._amostra(betaGlicosidade=50.0)
+        assert amostra.betaGlicosidase == 50.0
+        assert amostra.to_dict("v2")["betaGlicosidase"] == 50.0
+
+    def test_grafias_conflitantes_levantam_erro(self):
+        with pytest.raises(ValueError, match="valores diferentes"):
+            self._amostra(betaGlicosidase=50.0, betaGlicosidade=70.0)
+
+    def test_omitida_nao_aparece_em_nenhum_contrato(self):
+        for contrato in ("v1", "v2"):
+            d = self._amostra().to_dict(contrato)
+            assert "betaGlicosidase" not in d
+            assert "betaGlicosidade" not in d
+
+    def test_contrato_invalido(self):
+        with pytest.raises(ValueError, match="não reconhecido"):
+            self._amostra().to_dict("v3")
+
+
+# ---------------------------------------------------------------------------
+# AnaliseSolo (payload combinado, exclusivo do v1)
 # ---------------------------------------------------------------------------
 
 class TestAnaliseSolo:
     def test_to_dict_com_cpf_e_cnpj(self, analise_solo):
         d = analise_solo.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpj"] == "54194116000138"
-        assert "cnpjPropriedade" not in d
+        assert d["cnpjPropriedade"] == "54194116000138"
+        # A chave legada "cnpj" não é mais emitida: dev/hml/prd já aceitam a canônica.
+        assert "cnpj" not in d
         assert isinstance(d["amostrasQuimicas"], list)
         assert len(d["amostrasQuimicas"]) == 1
-        assert "amostrasFisicas" not in d
+        assert len(d["amostrasFisicas"]) == 1
 
-    def test_to_dict_sem_cpf_e_cnpj(self, amostra):
-        a = AnaliseSolo(amostrasQuimicas=[amostra])
+    def test_to_dict_sem_cpf_e_cnpj(self, amostra, amostra_fisica):
+        a = AnaliseSolo(amostrasQuimicas=[amostra], amostrasFisicas=[amostra_fisica])
         d = a.to_dict()
         assert "cpfProdutor" not in d
         assert "cnpjPropriedade" not in d
         assert "cnpj" not in d
+
+    def test_combinado_exige_amostra_fisica(self, amostra):
+        with pytest.raises(ValueError, match="ao menos uma amostra física"):
+            AnaliseSolo(amostrasQuimicas=[amostra]).to_dict()
+
+    def test_combinado_nao_existe_no_v2(self, analise_solo):
+        with pytest.raises(ValueError, match="não existe no contrato v2"):
+            analise_solo.to_dict("v2")
+
+    def test_separar_devolve_as_duas_metades(self, amostra, amostra_fisica):
+        a = AnaliseSolo(
+            amostrasQuimicas=[amostra],
+            amostrasFisicas=[amostra_fisica],
+            cpfProdutor="68122528082",
+            cnpjPropriedade="54194116000138",
+            cnpjLaboratorio="13610724000107",
+        )
+        quimica, fisica = a.separar()
+        assert quimica.amostrasQuimicas == [amostra]
+        assert quimica.cnpjLaboratorio == "13610724000107"
+        assert fisica is not None
+        assert fisica.amostrasFisicas == [amostra_fisica]
+        assert fisica.cpfProdutor == "68122528082"
+
+    def test_separar_sem_amostras_fisicas(self, amostra):
+        quimica, fisica = AnaliseSolo(amostrasQuimicas=[amostra]).separar()
+        assert quimica.amostrasQuimicas == [amostra]
+        assert fisica is None
+
+
+# ---------------------------------------------------------------------------
+# AnaliseSoloQuimica / AnaliseSoloFisica (endpoints por tipo)
+# ---------------------------------------------------------------------------
+
+class TestAnaliseSoloPorTipo:
+    def test_quimica_v1(self, amostra):
+        a = AnaliseSoloQuimica(
+            amostrasQuimicas=[amostra],
+            cpfProdutor="68122528082",
+            cnpjPropriedade="54194116000138",
+        )
+        d = a.to_dict("v1")
+        assert d["cpfProdutor"] == "68122528082"
+        assert d["cnpjPropriedade"] == "54194116000138"
+        assert len(d["amostrasQuimicas"]) == 1
+        assert "amostrasFisicas" not in d
+
+    def test_fisica_v1(self, amostra_fisica):
+        a = AnaliseSoloFisica(amostrasFisicas=[amostra_fisica], cpfProdutor="68122528082")
+        d = a.to_dict("v1")
+        assert len(d["amostrasFisicas"]) == 1
+        assert "amostrasQuimicas" not in d
+
+    def test_v2_exige_cnpj_laboratorio(self, amostra):
+        a = AnaliseSoloQuimica(amostrasQuimicas=[amostra], cpfProdutor="68122528082")
+        with pytest.raises(ValueError, match="cnpjLaboratorio"):
+            a.to_dict("v2")
+
+    def test_v2_com_cnpj_laboratorio(self, amostra):
+        a = AnaliseSoloQuimica(
+            amostrasQuimicas=[amostra],
+            cpfProdutor="68122528082",
+            cnpjLaboratorio="13610724000107",
+        )
+        d = a.to_dict("v2")
+        assert d["cnpjLaboratorio"] == "13610724000107"
+
+    def test_v1_nao_exige_cnpj_laboratorio(self, amostra_fisica):
+        d = AnaliseSoloFisica(
+            amostrasFisicas=[amostra_fisica], cpfProdutor="68122528082"
+        ).to_dict("v1")
+        assert "cnpjLaboratorio" not in d
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +383,9 @@ class TestSensoriamentoRemoto:
     def test_to_dict_campos_opcionais_presentes(self, sensoriamento_remoto):
         d = sensoriamento_remoto.to_dict()
         assert d["cpfProdutor"] == "68122528082"
-        assert d["cnpj"] == "54194116000138"
-        assert "cnpjPropriedade" not in d
+        assert d["cnpjPropriedade"] == "54194116000138"
+        # A chave legada "cnpj" não é mais emitida: dev/hml/prd já aceitam a canônica.
+        assert "cnpj" not in d
         assert d["codigoSatelitePlantioContorno"] == "S08"
         assert d["codigoSateliteTerraceamento"] == "S07"
 
@@ -318,3 +446,93 @@ class TestSensoriamentoRemoto:
         assert d["interpretacoesCoberturaSolo"] == []
         assert d["interpretacoesCultura"] == []
         assert d["interpretacoesManejo"] == []
+
+
+# ---------------------------------------------------------------------------
+# Cultura-alvo e DadoGleba nos contratos v1/v2
+# ---------------------------------------------------------------------------
+
+class TestCulturaAlvo:
+    def test_construtores(self):
+        assert CulturaAlvo.soja("2026-10-01", "2027-01-10").cultura.codigo == "001"
+        assert CulturaAlvo.milho("2026-10-01", "2027-02-15").cultura.codigo == "002"
+        assert CulturaAlvo.de_nome(" Milho ", "2026-10-01", "2027-02-15").cultura.codigo == "002"
+
+    def test_nome_desconhecido(self):
+        with pytest.raises(ValueError, match="não reconhecida"):
+            CulturaAlvo.de_nome("trigo", "2026-10-01", "2027-01-10")
+
+    def test_codigo_fora_do_alvo(self):
+        with pytest.raises(ValueError, match="não é alvo"):
+            CulturaAlvo(Cultura("072"), "2026-10-01", "2027-01-10")
+
+    def test_to_dict(self):
+        d = CulturaAlvo.milho("2026-10-01", "2027-02-15", ilp=True).to_dict()
+        assert d == {
+            "cultura": {"codigo": "002"},
+            "dataPrevisaoPlantio": "2026-10-01",
+            "dataPrevisaoColheita": "2027-02-15",
+            "ilp": True,
+        }
+
+
+class TestDadoGlebaContratos:
+    @pytest.fixture
+    def gleba_milho(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada]
+        dado_gleba.culturaAlvo = CulturaAlvo.milho("2026-10-01", "2027-02-15")
+        return dado_gleba
+
+    def test_v1_sem_cultura_alvo_inalterado(self, dado_gleba):
+        d = dado_gleba.to_dict()
+        assert "culturaAlvo" not in d
+        assert len(d["producoes"]) == len(dado_gleba.producoes)
+
+    def test_v1_cultura_alvo_vira_producao_atual(self, gleba_milho):
+        d = gleba_milho.to_dict("v1")
+        assert "culturaAlvo" not in d
+        atual = d["producoes"][-1]
+        assert atual["cultura"] == {"codigo": "002"}
+        assert atual["dataPrevisaoPlantio"] == "2026-10-01"
+        assert atual["dataPrevisaoColheita"] == "2027-02-15"
+
+    def test_v2_cultura_alvo_declarada(self, gleba_milho):
+        d = gleba_milho.to_dict("v2")
+        assert d["culturaAlvo"]["cultura"] == {"codigo": "002"}
+        assert len(d["producoes"]) == 1
+        assert "dataPrevisaoPlantio" not in d["producoes"][0]
+
+    def test_v2_promove_producao_atual(self, dado_gleba):
+        d = dado_gleba.to_dict("v2")
+        assert d["culturaAlvo"]["cultura"] == {"codigo": "001"}
+        assert d["culturaAlvo"]["dataPrevisaoPlantio"] == "2026-10-01"
+        assert all("dataPrevisaoPlantio" not in p for p in d["producoes"])
+
+    def test_v2_unica_producao_promovida_falha(self, dado_gleba):
+        atual = [p for p in dado_gleba.producoes if p.dataPrevisaoPlantio and p.dataPrevisaoColheita]
+        dado_gleba.producoes = atual
+        assert dado_gleba.to_dict("v1")["producoes"]
+        with pytest.raises(ValueError, match="ao menos uma produção no histórico"):
+            dado_gleba.to_dict("v2")
+
+    def test_v2_cultura_alvo_sem_historico_falha(self, gleba_milho):
+        gleba_milho.producoes = []
+        with pytest.raises(ValueError, match="ao menos uma produção no histórico"):
+            gleba_milho.to_dict("v2")
+
+    def test_v2_sem_alvo_falha(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada]
+        with pytest.raises(ValueError, match="exige culturaAlvo"):
+            dado_gleba.to_dict("v2")
+
+    def test_v2_producao_atual_fora_do_alvo_falha(self, dado_gleba, producao_passada):
+        dado_gleba.producoes = [producao_passada, Producao(
+            cultura=Cultura("085"), dataPrevisaoPlantio="2026-05-01", dataPrevisaoColheita="2026-09-01")]
+        with pytest.raises(ValueError, match="não é alvo"):
+            dado_gleba.to_dict("v2")
+
+    @pytest.mark.parametrize("contrato", ["v1", "v2"])
+    def test_alvo_declarado_duas_vezes_falha(self, dado_gleba, contrato):
+        dado_gleba.culturaAlvo = CulturaAlvo.soja("2026-10-01", "2027-01-10")
+        with pytest.raises(ValueError, match="só o histórico"):
+            dado_gleba.to_dict(contrato)

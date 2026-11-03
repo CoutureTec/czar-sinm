@@ -157,8 +157,28 @@ class ValidationError(APIError):
     """Erro de validação dos dados enviados (HTTP 400/422)."""
 
 
+_CLIENTS_INTERNOS_KEYCLOAK = {"account", "realm-management", "broker"}
+
+
 class PermissaoError(APIError):
-    """Acesso negado (HTTP 403) — roles insuficientes."""
+    """Acesso negado (HTTP 403) — roles insuficientes.
+
+    Os roles de operação (``OPERADOR_*``) são **client roles**: atribuídos por
+    empresa (client = CNPJ) e exigidos na empresa dona do dado. ``ADMINISTRADOR``
+    é **realm role**. O relatório compara os roles exigidos com os do escopo certo.
+
+    Atributos
+    ---------
+    roles_usuario:
+        Realm roles do token.
+    roles_por_client:
+        Client roles do token, ``{client_id: [roles]}``. ``None`` quando não
+        informados — o relatório então compara com ``roles_usuario``.
+    roles_necessarios:
+        Roles aceitos pelo endpoint (basta um).
+    escopo:
+        ``'client'``, ``'realm'`` ou ``None`` (endpoint que exige só autenticação).
+    """
 
     def __init__(
         self,
@@ -168,11 +188,23 @@ class PermissaoError(APIError):
         endpoint: str = "",
         roles_usuario: Optional[list] = None,
         roles_necessarios: Optional[list] = None,
+        roles_por_client: Optional[dict] = None,
+        escopo: Optional[str] = None,
     ):
         self.endpoint = endpoint
         self.roles_usuario = roles_usuario or []
         self.roles_necessarios = roles_necessarios or []
+        self.roles_por_client = (
+            None if roles_por_client is None else {
+                c: list(r) for c, r in roles_por_client.items()
+                if r and c not in _CLIENTS_INTERNOS_KEYCLOAK
+            }
+        )
+        self.escopo = escopo
         super().__init__(status_code, message, body)
+
+    def _clients_com_role(self, role: str) -> list:
+        return sorted(c for c, roles in (self.roles_por_client or {}).items() if role in roles)
 
     def format_report(self) -> str:
         W = 62
@@ -193,13 +225,25 @@ class PermissaoError(APIError):
             lines.append(row(f"Endpoint : {self.endpoint}"))
             lines.append(divider())
 
-        # Roles que o usuário possui
-        lines.append(row("Roles do usuário:"))
-        if self.roles_usuario:
-            for r in sorted(self.roles_usuario):
-                lines.append(row(f"  • {r}"))
+        por_client = self.roles_por_client is not None and self.escopo != "realm"
+
+        # Roles que o usuário possui, no escopo que o endpoint exige
+        if por_client:
+            lines.append(row("Client roles do usuário (por empresa/CNPJ):"))
+            if self.roles_por_client:
+                for client in sorted(self.roles_por_client):
+                    lines.append(row(f"  {client}:"))
+                    for r in sorted(self.roles_por_client[client]):
+                        lines.append(row(f"    • {r}"))
+            else:
+                lines.append(row("  (nenhum role encontrado no token)"))
         else:
-            lines.append(row("  (nenhum role encontrado no token)"))
+            lines.append(row("Roles do usuário:"))
+            if self.roles_usuario:
+                for r in sorted(self.roles_usuario):
+                    lines.append(row(f"  • {r}"))
+            else:
+                lines.append(row("  (nenhum role encontrado no token)"))
 
         lines.append(divider())
 
@@ -208,16 +252,35 @@ class PermissaoError(APIError):
             lines.append(row(f"Roles aceitos por '{self.endpoint}':"))
             faltam = []
             for r in sorted(self.roles_necessarios):
-                if r in self.roles_usuario:
+                if por_client:
+                    clients = self._clients_com_role(r)
+                    if clients:
+                        lines.append(row(f"  ✓ {r}  ← em {', '.join(clients)}"))
+                        continue
+                elif r in self.roles_usuario:
                     lines.append(row(f"  ✓ {r}  ← você possui este role"))
-                else:
-                    lines.append(row(f"  ✗ {r}"))
-                    faltam.append(r)
+                    continue
+                lines.append(row(f"  ✗ {r}"))
+                faltam.append(r)
 
-            if faltam:
-                lines.append(divider())
+            lines.append(divider())
+            if self.escopo == "realm":
+                lines.append(row("Operação administrativa: exige realm role e"))
+                lines.append(row("não está disponível para integradores."))
+            elif faltam and len(faltam) == len(self.roles_necessarios):
                 lines.append(row("Solicite à equipe SiNM um dos roles acima"))
                 lines.append(row("marcados com ✗ para seu usuário no Keycloak."))
+            elif por_client:
+                lines.append(row("O role precisa estar no client da empresa"))
+                lines.append(row("(CNPJ) dona do dado. Confira se o CNPJ"))
+                lines.append(row("enviado é de uma empresa listada acima."))
+            elif faltam:
+                lines.append(row("Solicite à equipe SiNM um dos roles acima"))
+                lines.append(row("marcados com ✗ para seu usuário no Keycloak."))
+        elif self.escopo is None and self.roles_por_client is not None:
+            lines.append(row("Este endpoint não exige role: o acesso vem da"))
+            lines.append(row("chave de classificação ou do escopo da sua"))
+            lines.append(row("empresa. Confira a chave/CNPJ informados."))
         else:
             lines.append(row("Roles necessários não identificados."))
             lines.append(row("Verifique as permissões com a equipe SiNM."))

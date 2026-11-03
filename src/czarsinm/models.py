@@ -1,14 +1,38 @@
 """
 Modelos de dados para os payloads da API SINM.
 Baseado nos tipos de input do sistema:
-  - DadoGlebaInput (produtor, propriedade, talhao, manejos, coberturas, producoes)
-  - AnaliseSoloInput (cpfProdutor, cnpj, amostras)
+  - DadoGlebaInput / DadoGlebaV2Input (produtor, propriedade, talhao, culturaAlvo,
+    manejos, coberturas, producoes)
+  - AnaliseSoloInput / AnaliseSoloQuimicaInput / AnaliseSoloFisicaInput
   - MonitoramentoSateliteInput (sensoriamento remoto)
+
+Contratos v1 e v2
+-----------------
+Os modelos serializam para os dois contratos da API. ``to_dict()`` aceita o
+parâmetro ``contrato`` (``'v1'``, o padrão, ou ``'v2'``):
+
+- **v1** — contrato congelado: aceita os nomes canônicos e os legados. Onde a
+  chave canônica ainda não existe em todos os ambientes (``betaGlicosidase``,
+  estreando na v6.2026 de homologação), o payload leva **as duas grafias** — é o
+  payload de transição recomendado pela API, e o ambiente ignora a que não
+  conhece.
+- **v2** — contrato limpo (estreia em homologação em 04/08/2026): só nomes
+  canônicos e ``cnpjLaboratorio`` obrigatório. Nome legado enviado ao v2 é
+  descartado **em silêncio**, sem erro — por isso os modelos nunca os emitem no v2.
+  Na gleba, a cultura a classificar é declarada em ``culturaAlvo`` (soja ou milho
+  grão) em vez de inferida da produção com previsão de plantio e colheita.
+
+Um mesmo :class:`DadoGleba` serializa para os dois contratos: ver
+:meth:`DadoGleba.to_dict`.
 """
 
 from __future__ import annotations
+import warnings
 from dataclasses import dataclass, field, asdict
 from typing import Optional
+
+CONTRATOS = ("v1", "v2")
+"""Contratos de payload suportados pelos modelos."""
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +52,14 @@ def _remove_none(d: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+def _validar_contrato(contrato: str) -> str:
+    if contrato not in CONTRATOS:
+        raise ValueError(
+            f"Contrato '{contrato}' não reconhecido. Use um de: {', '.join(CONTRATOS)}."
+        )
+    return contrato
 
 
 # ---------------------------------------------------------------------------
@@ -128,10 +160,22 @@ class CoberturaSolo:
         return asdict(self)
 
 
+CULTURA_SOJA = "001"
+"""Código de Soja (grão) — cultura-alvo de classificação."""
+
+CULTURA_MILHO = "002"
+"""Código de Milho (grão) — cultura-alvo de classificação."""
+
+CULTURAS_ALVO = {"soja": CULTURA_SOJA, "milho": CULTURA_MILHO}
+"""Culturas para as quais o nível de manejo é calculado, por nome → código."""
+
+
 @dataclass
 class Cultura:
     codigo: str
-    """Código da cultura. Ex: '001' (soja), '018' (milho), '020' (sorgo), '072' (trigo)."""
+    """Código da cultura (3 dígitos). Ex.: '001' Soja (grão), '002' Milho (grão),
+    '072' Milho (silagem/feno), '085' Trigo (grão), '020' Aveia preta (cobertura do
+    solo). Lista completa em GET /api/v1/culturas."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -169,11 +213,97 @@ class Producao:
 
 
 @dataclass
+class CulturaAlvo:
+    """Cultura para a qual o nível de manejo será calculado (``CulturaAlvoInput``).
+
+    Só soja grão (``'001'``) e milho grão (``'002'``) são alvo de classificação.
+    Use os construtores :meth:`soja` e :meth:`milho`, ou :meth:`de_nome` quando a
+    cultura vier de configuração::
+
+        CulturaAlvo.milho("2026-10-01", "2027-02-15")
+        CulturaAlvo.de_nome("soja", "2026-10-01", "2027-01-10")
+    """
+    cultura: Cultura
+    dataPrevisaoPlantio: str
+    """Data prevista de plantio (formato 'YYYY-MM-DD')."""
+    dataPrevisaoColheita: str
+    """Data prevista de colheita (formato 'YYYY-MM-DD')."""
+    ilp: bool = False
+    """Integração Lavoura-Pecuária."""
+
+    def __post_init__(self) -> None:
+        if self.cultura.codigo not in CULTURAS_ALVO.values():
+            raise ValueError(
+                f"Cultura-alvo '{self.cultura.codigo}' não é alvo de classificação. "
+                f"Use soja grão ({CULTURA_SOJA}) ou milho grão ({CULTURA_MILHO})."
+            )
+
+    @classmethod
+    def soja(cls, data_previsao_plantio: str, data_previsao_colheita: str, ilp: bool = False) -> "CulturaAlvo":
+        """Soja (grão) como cultura-alvo."""
+        return cls(Cultura(CULTURA_SOJA), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    @classmethod
+    def milho(cls, data_previsao_plantio: str, data_previsao_colheita: str, ilp: bool = False) -> "CulturaAlvo":
+        """Milho (grão) como cultura-alvo."""
+        return cls(Cultura(CULTURA_MILHO), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    @classmethod
+    def de_nome(cls, nome: str, data_previsao_plantio: str, data_previsao_colheita: str,
+                ilp: bool = False) -> "CulturaAlvo":
+        """Cultura-alvo pelo nome (``'soja'`` ou ``'milho'``, sem distinção de caixa)."""
+        codigo = CULTURAS_ALVO.get(nome.strip().lower())
+        if codigo is None:
+            raise ValueError(
+                f"Cultura-alvo '{nome}' não reconhecida. Use uma de: {', '.join(CULTURAS_ALVO)}."
+            )
+        return cls(Cultura(codigo), data_previsao_plantio, data_previsao_colheita, ilp)
+
+    def como_producao(self) -> Producao:
+        """A cultura-alvo na forma do v1: a produção com previsão de plantio e colheita."""
+        return Producao(
+            cultura=self.cultura,
+            ilp=self.ilp,
+            dataPrevisaoPlantio=self.dataPrevisaoPlantio,
+            dataPrevisaoColheita=self.dataPrevisaoColheita,
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "cultura": self.cultura.to_dict(),
+            "dataPrevisaoPlantio": self.dataPrevisaoPlantio,
+            "dataPrevisaoColheita": self.dataPrevisaoColheita,
+            "ilp": self.ilp,
+        }
+
+
+def _eh_producao_atual(p: Producao) -> bool:
+    """Produção com as duas previsões — é o que a API lê como cultura-alvo no v1."""
+    return bool(p.dataPrevisaoPlantio and p.dataPrevisaoColheita)
+
+
+@dataclass
 class DadoGleba:
     """
     Payload completo para cadastro de talhão/gleba.
 
-    Corresponde ao DadoGlebaInput da API.
+    Corresponde ao ``DadoGlebaInput`` (v1) e ao ``DadoGlebaV2Input`` (v2) da API.
+    A diferença entre os contratos é onde a cultura a classificar é declarada:
+
+    - **v1** — inferida: é a única produção com ``dataPrevisaoPlantio`` e
+      ``dataPrevisaoColheita``. Cultura fora de soja/milho grão cai em soja e a API
+      registra inconsistência.
+    - **v2** — campo próprio ``culturaAlvo``; ``producoes`` é só histórico.
+      Cultura fora de soja/milho grão é recusada com 400.
+
+    Informe ``culturaAlvo`` e mantenha em ``producoes`` só o histórico: o mesmo
+    objeto serializa corretamente para os dois contratos (no v1 a cultura-alvo
+    vira a produção atual, no fim da lista). Sem ``culturaAlvo``, a produção atual
+    em ``producoes`` é promovida a cultura-alvo no v2.
+
+    No v2 o histórico precisa de ao menos um cultivo além da cultura-alvo: uma
+    gleba cuja única produção é a atual serializa no v1, mas não no v2
+    (``ValueError`` antes da chamada).
     """
     produtor: Produtor
     propriedade: Propriedade
@@ -183,49 +313,64 @@ class DadoGleba:
     coberturas: list[CoberturaSolo]
     """Mínimo 1 avaliação de cobertura obrigatória."""
     producoes: list[Producao]
-    """Mínimo 1 produção (passada ou futura) obrigatória."""
+    """Histórico de cultivos (mínimo 1, sem contar a cultura-alvo). Sem
+    ``culturaAlvo``, deve conter também a produção atual (com as duas previsões) —
+    forma do v1."""
+    culturaAlvo: Optional[CulturaAlvo] = None
+    """Cultura a classificar: soja ou milho grão. Ver :class:`CulturaAlvo`."""
 
-    def to_dict(self) -> dict:
-        return {
+    def _historico_e_alvo(self) -> tuple[list[Producao], Optional[CulturaAlvo]]:
+        atuais = [p for p in self.producoes if _eh_producao_atual(p)]
+        if self.culturaAlvo is not None:
+            if atuais:
+                raise ValueError(
+                    "Com culturaAlvo informada, producoes deve conter só o histórico: "
+                    "remova a produção com dataPrevisaoPlantio e dataPrevisaoColheita."
+                )
+            return list(self.producoes), self.culturaAlvo
+        if len(atuais) != 1:
+            return list(self.producoes), None
+        atual = atuais[0]
+        historico = [p for p in self.producoes if p is not atual]
+        return historico, CulturaAlvo(
+            cultura=atual.cultura,
+            dataPrevisaoPlantio=atual.dataPrevisaoPlantio,
+            dataPrevisaoColheita=atual.dataPrevisaoColheita,
+            ilp=atual.ilp,
+        )
+
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        d = {
             "produtor": self.produtor.to_dict(),
             "propriedade": self.propriedade.to_dict(),
             "talhao": self.talhao.to_dict(),
             "manejos": [m.to_dict() for m in self.manejos],
             "coberturas": [c.to_dict() for c in self.coberturas],
-            "producoes": [p.to_dict() for p in self.producoes],
         }
+        if contrato == "v1":
+            producoes = list(self.producoes)
+            if self.culturaAlvo is not None:
+                self._historico_e_alvo()  # recusa alvo declarado duas vezes
+                producoes.append(self.culturaAlvo.como_producao())
+            d["producoes"] = [p.to_dict() for p in producoes]
+            return d
 
-
-# ---------------------------------------------------------------------------
-# Operação (fluxo combinado)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class DadosInput:
-    """
-    Payload para o endpoint POST /api/v1/operacoes.
-
-    Referencia recursos já cadastrados pelos seus UUIDs e fornece as
-    produções para disparar o processamento da classificação de NM.
-    """
-    uuidGleba: str
-    """UUID da gleba previamente cadastrada."""
-    uuidAnaliseSolo: str
-    """UUID da análise de solo previamente cadastrada."""
-    uuidSensoriamentoRemoto: str
-    """UUID do sensoriamento remoto previamente cadastrado."""
-    producaoAtual: Producao
-    """Produção da safra atual."""
-    producoesAnteriores: list
-
-    def to_dict(self) -> dict:
-        return {
-            "uuidGleba": self.uuidGleba,
-            "uuidAnaliseSolo": self.uuidAnaliseSolo,
-            "uuidSensoriamentoRemoto": self.uuidSensoriamentoRemoto,
-            "producaoAtual": self.producaoAtual.to_dict(),
-            "producoesAnteriores": [p.to_dict() for p in self.producoesAnteriores],
-        }
+        historico, alvo = self._historico_e_alvo()
+        if alvo is None:
+            raise ValueError(
+                "O contrato v2 exige culturaAlvo (soja ou milho grão). Informe "
+                "DadoGleba(culturaAlvo=CulturaAlvo.soja(...)) ou CulturaAlvo.milho(...)."
+            )
+        if not historico:
+            raise ValueError(
+                "O contrato v2 exige ao menos uma produção no histórico: producoes "
+                "guarda os cultivos anteriores e não inclui a cultura-alvo. Informe "
+                "o cultivo anterior da gleba em producoes."
+            )
+        d["culturaAlvo"] = alvo.to_dict()
+        d["producoes"] = [p.to_dict() for p in historico]
+        return d
 
 
 # ---------------------------------------------------------------------------
@@ -287,15 +432,49 @@ class AmostraQuimica:
     """Fósforo Resina em mg/dm³ (0–100). Opcional."""
     arilsulfatase: Optional[float] = None
     """Arilsulfatase em nmol/g/h (0–800). Opcional."""
+    betaGlicosidase: Optional[float] = None
+    """Beta-glicosidase em nmol/g/h (0–500). Opcional. Grafia canônica desde a
+    v6.2026 — a antiga `betaGlicosidade` (erro de grafia) segue aceita no envio ao
+    /api/v1, porém DEPRECIADA, e é ignorada pelo /api/v2."""
     betaGlicosidade: Optional[float] = None
-    """Beta-glicosidade em nmol/g/h (0–500). Opcional."""
+    """DEPRECIADO — use `betaGlicosidase`. Mantido para não quebrar código existente:
+    se informado sozinho, alimenta o campo canônico (com DeprecationWarning)."""
     densidadeSolo: Optional[float] = None
     """Densidade do solo em g/cm³ (0–3). Opcional."""
     pontos: list[Ponto] = field(default_factory=list)
     """Pontos geográficos adicionais. Opcional."""
 
-    def to_dict(self) -> dict:
-        return _remove_none(asdict(self))
+    def __post_init__(self) -> None:
+        if self.betaGlicosidade is None:
+            return
+        if self.betaGlicosidase is None:
+            warnings.warn(
+                "betaGlicosidade está depreciado (erro de grafia): use betaGlicosidase. "
+                "A grafia antiga continua aceita no /api/v1 durante a transição.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            self.betaGlicosidase = self.betaGlicosidade
+        elif self.betaGlicosidade != self.betaGlicosidase:
+            raise ValueError(
+                "betaGlicosidase e betaGlicosidade (depreciado) foram informados com "
+                f"valores diferentes ({self.betaGlicosidase} != {self.betaGlicosidade}). "
+                "Informe apenas betaGlicosidase."
+            )
+
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        d = _remove_none(asdict(self))
+        # A grafia é reconciliada em __post_init__; a serialização decide só quais
+        # chaves vão no fio. O v1 leva as duas (a produção ainda só conhece a
+        # legada); o v2 aceita apenas a canônica e descartaria a legada em silêncio.
+        d.pop("betaGlicosidade", None)
+        d.pop("betaGlicosidase", None)
+        if self.betaGlicosidase is not None:
+            d["betaGlicosidase"] = self.betaGlicosidase
+            if contrato == "v1":
+                d["betaGlicosidade"] = self.betaGlicosidase
+        return d
 
 
 # Alias para compatibilidade com código existente
@@ -327,16 +506,101 @@ class AmostraFisica:
     pontos: list[Ponto] = field(default_factory=list)
     """Pontos geográficos adicionais. Opcional."""
 
-    def to_dict(self) -> dict:
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        # A amostra física não tem campo legado: o payload é idêntico nos dois contratos.
         return _remove_none(asdict(self))
 
 
-@dataclass
-class AnaliseSolo:
-    """
-    Payload para cadastro de análise de solo.
+# ---------------------------------------------------------------------------
+# Identificação comum aos payloads de análise de solo
+# ---------------------------------------------------------------------------
 
-    Corresponde ao AnaliseSoloInput da API.
+class _IdentificacaoAnalise:
+    """Serialização dos campos de identificação comuns às análises de solo.
+
+    Espelha o ``AnaliseSoloInputBase`` (v1) / ``AnaliseSoloV2InputBase`` (v2) da API:
+    ``cpfProdutor``, ``cnpjPropriedade`` e ``cnpjLaboratorio``. A chave legada ``cnpj``
+    **não** é emitida: os três ambientes (dev/hml/prd) já aceitam a canônica
+    ``cnpjPropriedade``, e o v2 descartaria a legada em silêncio.
+    """
+
+    def _identificacao_dict(self, contrato: str) -> dict:
+        if contrato == "v2" and not self.cnpjLaboratorio:
+            raise ValueError(
+                "O contrato v2 exige cnpjLaboratorio (a API responde 400 sem ele). "
+                "Informe o CNPJ do laboratório ou use o contrato v1."
+            )
+        d: dict = {}
+        if self.cpfProdutor:
+            d["cpfProdutor"] = self.cpfProdutor
+        if self.cnpjPropriedade:
+            d["cnpjPropriedade"] = self.cnpjPropriedade
+        if self.cnpjLaboratorio:
+            d["cnpjLaboratorio"] = self.cnpjLaboratorio
+        return d
+
+
+@dataclass
+class AnaliseSoloQuimica(_IdentificacaoAnalise):
+    """
+    Payload para cadastro de análise de solo **química** por tipo.
+
+    Corresponde ao ``AnaliseSoloQuimicaInput`` (v1) / ``AnaliseSoloQuimicaV2Input`` (v2)
+    da API: ``POST /api/{v1,v2}/analises-solo/quimica``.
+    """
+    amostrasQuimicas: list[AmostraQuimica]
+    """Mínimo 1 amostra química obrigatória."""
+    cpfProdutor: Optional[str] = None
+    """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
+    cnpjPropriedade: Optional[str] = None
+    """CNPJ da propriedade (14 dígitos). Opcional."""
+    cnpjLaboratorio: Optional[str] = None
+    """CNPJ do laboratório (14 dígitos). Opcional no v1, **obrigatório** no v2.
+    Só vincula a análise ao laboratório se ele estiver cadastrado na base — senão o
+    envio é aceito com a inconsistência RN19."""
+
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        d = self._identificacao_dict(contrato)
+        d["amostrasQuimicas"] = [a.to_dict(contrato) for a in self.amostrasQuimicas]
+        return d
+
+
+@dataclass
+class AnaliseSoloFisica(_IdentificacaoAnalise):
+    """
+    Payload para cadastro de análise de solo **física** por tipo.
+
+    Corresponde ao ``AnaliseSoloFisicaInput`` (v1) / ``AnaliseSoloFisicaV2Input`` (v2)
+    da API: ``POST /api/{v1,v2}/analises-solo/fisica``.
+    """
+    amostrasFisicas: list[AmostraFisica]
+    """Amostras físicas. Obrigatórias se não houver amostra física válida cadastrada
+    nos últimos 10 anos."""
+    cpfProdutor: Optional[str] = None
+    """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
+    cnpjPropriedade: Optional[str] = None
+    """CNPJ da propriedade (14 dígitos). Opcional."""
+    cnpjLaboratorio: Optional[str] = None
+    """CNPJ do laboratório (14 dígitos). Opcional no v1, **obrigatório** no v2."""
+
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        d = self._identificacao_dict(contrato)
+        d["amostrasFisicas"] = [a.to_dict(contrato) for a in self.amostrasFisicas]
+        return d
+
+
+@dataclass
+class AnaliseSolo(_IdentificacaoAnalise):
+    """
+    Payload combinado (química + física) para cadastro de análise de solo.
+
+    Corresponde ao ``AnaliseSoloInput`` da API — a fachada ``POST /api/v1/analises-solo``,
+    que cria as **duas metades** numa transação. É **exclusiva do v1**: no v2 use
+    :class:`AnaliseSoloQuimica` e :class:`AnaliseSoloFisica`, cada uma na sua rota.
+    Segue mantida por compatibilidade, sem prazo de remoção.
     """
     amostrasQuimicas: list[AmostraQuimica]
     """Mínimo 1 amostra química obrigatória."""
@@ -347,21 +611,51 @@ class AnaliseSolo:
     cnpjLaboratorio: Optional[str] = None
     """CNPJ do laboratório (14 dígitos). Opcional."""
     amostrasFisicas: list[AmostraFisica] = field(default_factory=list)
-    """Amostras físicas de solo. Opcional."""
+    """Mínimo 1 amostra física obrigatória no payload combinado. Para enviar só a
+    química, use :class:`AnaliseSoloQuimica` no endpoint por tipo."""
 
-    def to_dict(self) -> dict:
-        d: dict = {"amostrasQuimicas": [a.to_dict() for a in self.amostrasQuimicas]}
-        if self.amostrasFisicas:
-            d["amostrasFisicas"] = [a.to_dict() for a in self.amostrasFisicas]
-        if self.cpfProdutor:
-            d["cpfProdutor"] = self.cpfProdutor
-        if self.cnpjPropriedade:
-            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
-            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
-            d["cnpj"] = self.cnpjPropriedade
-        if self.cnpjLaboratorio:
-            d["cnpjLaboratorio"] = self.cnpjLaboratorio
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
+        if contrato == "v2":
+            raise ValueError(
+                "O payload combinado não existe no contrato v2. Use AnaliseSoloQuimica "
+                "e AnaliseSoloFisica nas rotas /api/v2/analises-solo/{quimica,fisica}."
+            )
+        if not self.amostrasFisicas:
+            raise ValueError(
+                "O payload combinado exige ao menos uma amostra física. Para enviar só "
+                "a análise química, use AnaliseSoloQuimica com "
+                "cadastrar_analise_solo_quimica (ou AnaliseSolo.separar())."
+            )
+        d: dict = {
+            "amostrasQuimicas": [a.to_dict(contrato) for a in self.amostrasQuimicas],
+            "amostrasFisicas": [a.to_dict(contrato) for a in self.amostrasFisicas],
+        }
+        d.update(self._identificacao_dict(contrato))
         return d
+
+    def separar(self) -> tuple[AnaliseSoloQuimica, Optional[AnaliseSoloFisica]]:
+        """Divide o payload combinado nas duas metades por tipo.
+
+        Atalho para migrar do endpoint combinado (v1) para os endpoints por tipo,
+        que são os únicos no v2. A metade física é ``None`` quando não há amostras
+        físicas.
+        """
+        quimica = AnaliseSoloQuimica(
+            amostrasQuimicas=self.amostrasQuimicas,
+            cpfProdutor=self.cpfProdutor,
+            cnpjPropriedade=self.cnpjPropriedade,
+            cnpjLaboratorio=self.cnpjLaboratorio,
+        )
+        fisica = None
+        if self.amostrasFisicas:
+            fisica = AnaliseSoloFisica(
+                amostrasFisicas=self.amostrasFisicas,
+                cpfProdutor=self.cpfProdutor,
+                cnpjPropriedade=self.cnpjPropriedade,
+                cnpjLaboratorio=self.cnpjLaboratorio,
+            )
+        return quimica, fisica
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +735,9 @@ class SensoriamentoRemoto:
     """
     Payload para cadastro de sensoriamento remoto.
 
-    Corresponde ao MonitoramentoSateliteInput da API.
+    Corresponde ao ``MonitoramentoSateliteInput`` (v1) / ``MonitoramentoSateliteV2Input``
+    (v2) da API. O payload é o mesmo nos dois contratos: só a chave canônica
+    ``cnpjPropriedade`` é emitida, e ela é aceita pelas duas rotas.
     """
     dataInicial: str
     """Data inicial do período monitorado (formato 'YYYY-MM-DD')."""
@@ -473,7 +769,8 @@ class SensoriamentoRemoto:
     interpretacoesCultura: list[InterpretacaoCultura] = field(default_factory=list)
     interpretacoesManejo: list[InterpretacaoManejo] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self, contrato: str = "v1") -> dict:
+        _validar_contrato(contrato)
         d: dict = {
             "dataInicial": self.dataInicial,
             "dataFinal": self.dataFinal,
@@ -489,9 +786,7 @@ class SensoriamentoRemoto:
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
         if self.cnpjPropriedade:
-            # Chave legada "cnpj": aceita pelo staging antigo e pela develop
-            # (via @JsonAlias). Reverter para "cnpjPropriedade" quando o hml subir.
-            d["cnpj"] = self.cnpjPropriedade
+            d["cnpjPropriedade"] = self.cnpjPropriedade
         if self.cnpjEmpresaSensoriamento:
             d["cnpjEmpresaSensoriamento"] = self.cnpjEmpresaSensoriamento
         if self.codigoSatelitePlantioContorno:

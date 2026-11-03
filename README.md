@@ -189,23 +189,95 @@ client.cadastrar_gleba(dado_gleba)               # POST /api/v1/glebas
 client.buscar_gleba(uuid)                        # GET  /api/v1/glebas/{uuid}
 client.listar_glebas()                           # GET  /api/v1/glebas
 
-# Análise de Solo
+# Análise de Solo — química
+client.cadastrar_analise_solo_quimica(analise, chave_classificacao_nm=chave)
+client.atualizar_analise_solo_quimica(uuid, analise)
+client.buscar_analise_solo_quimica(uuid)
+client.listar_analises_solo_quimicas()
+
+# Análise de Solo — física
+client.cadastrar_analise_solo_fisica(analise, chave_classificacao_nm=chave)
+client.atualizar_analise_solo_fisica(uuid, analise)
+client.buscar_analise_solo_fisica(uuid)
+client.listar_analises_solo_fisicas()
+
+# Análise de Solo — payload combinado (só /api/v1; química + física juntas)
 client.cadastrar_analise_solo(analise, chave_classificacao_nm=chave)
-client.buscar_analise_solo(uuid)
 client.listar_analises_solo()
+client.buscar_analise_solo(uuid)                 # depreciado → use ..._quimica(uuid)
+
+# Análises disponíveis para um CPF (sempre /api/v1; traz uuidAnaliseSolo)
+client.consultar_analises_disponiveis(cpf)
+client.consultar_analises_disponiveis(cpf, data_referencia="2026-08-04")
 
 # Sensoriamento Remoto  (chave_classificacao_nm obrigatória)
 client.cadastrar_sensoriamento_remoto(sensoriamento, chave_classificacao_nm=chave)
+client.atualizar_sensoriamento_remoto(uuid, sensoriamento)
 client.buscar_sensoriamento_remoto(uuid)
 client.listar_sensoriamentos_remotos()
+client.remover_sensoriamento_remoto(uuid)        # depreciado: só ADMINISTRADOR (403 p/ integradores)
 
 # Classificação Nível de Manejo
 client.consultar_classificacao(chave)            # GET  /api/v1/classificacoes/{chave}
-client.listar_classificacoes()                   # GET  /api/v1/classificacoes
-
-# Operação combinada (referencia recursos já cadastrados pelos UUIDs)
-client.cadastrar_operacao(dados_input)           # POST /api/v1/operacoes
+client.consultar_racional(chave)                 # GET  .../{chave}/racional
+client.listar_classificacoes()                   # GET  /api/v1/classificacoes (mais recente primeiro)
 ```
+
+Os `listar_*` percorrem todas as páginas da API e devolvem a lista completa.
+`SINMClient(tamanho_pagina=...)` muda quantos itens vêm por requisição (padrão 100).
+
+## Contrato v2 (opt-in)
+
+Por padrão o cliente fala `/api/v1`, o contrato estável — ele aceita os nomes
+canônicos **e** os legados, e nunca ganha campo obrigatório novo. Quem quiser o
+contrato limpo pede explicitamente:
+
+```python
+client = SINMClient(..., api_version="v2")
+client.api_version                               # "v2"
+```
+
+O que muda no `v2`:
+
+| | `v1` (default) | `v2` |
+|---|---|---|
+| Análise de solo | química, física **e** o payload combinado | só química e física — `cadastrar_analise_solo` levanta `ValueError` |
+| `cnpjLaboratorio` | opcional | **obrigatório** — o SDK valida antes de enviar (a API responde 400) |
+| Nomes legados (`cnpj`, `betaGlicosidade`) | aceitos e enviados junto | não enviados; se chegarem, a API os descarta em silêncio |
+
+| Gleba | safra a classificar como uma produção de `producoes` com as duas previsões | `culturaAlvo` obrigatório; `producoes` leva só o histórico |
+
+O roteamento por versão vale para gleba, análise de solo e sensoriamento remoto.
+Classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois modos —
+não existe `v2` desses recursos.
+
+### Cultura-alvo (soja ou milho)
+
+A safra que será classificada é declarada com `CulturaAlvo` — só soja (`001`)
+e milho (`002`) são cultura-alvo:
+
+```python
+from czarsinm import CulturaAlvo, DadoGleba
+
+alvo = CulturaAlvo.soja("2026-10-01", "2027-01-10")          # ou CulturaAlvo.milho(...)
+alvo = CulturaAlvo.de_nome("milho", "2026-10-01", "2027-02-20", ilp=False)
+
+dado = DadoGleba(..., producoes=historico, culturaAlvo=alvo)
+client.cadastrar_gleba(dado)               # v1 ou v2
+client.atualizar_gleba(uuid_gleba, dado)   # PUT
+```
+
+O mesmo `DadoGleba` serve aos dois contratos: no `v1` o SDK envia o alvo como
+a última produção de `producoes`; no `v2` envia `culturaAlvo` e só o histórico.
+Código antigo que põe a safra futura em `producoes` (sem `culturaAlvo`) continua
+funcionando nos dois — essa produção é promovida a alvo. No `v2`, porém,
+`producoes` precisa de ao menos um cultivo além do alvo: uma gleba cuja única
+produção é a safra futura serializa no `v1`, mas no `v2` levanta `ValueError`.
+Declarar `culturaAlvo` **e** uma produção com as duas previsões é erro.
+
+`betaGlicosidase` é a grafia canônica. A antiga `betaGlicosidade` (erro de
+grafia) ainda é aceita pelo dataclass, mas emite `DeprecationWarning`; informar
+as duas com valores diferentes é erro.
 
 ## Tratamento de erros
 
@@ -226,7 +298,7 @@ except AuthenticationError as e:
     # Falha no login ou credenciais inválidas
     print(f"Falha na autenticação: {e}")
 except PermissaoError as e:
-    # HTTP 403 — exibe roles do usuário vs. roles exigidos pelo endpoint
+    # HTTP 403 — exibe os client roles do usuário (por CNPJ) vs. roles exigidos
     print(e.format_report())
 except ValidationError as e:
     # HTTP 400/422 — payload com campos inválidos
@@ -241,6 +313,9 @@ except APIError as e:
 
 ### Exemplo de relatório de erro 403
 
+Os roles `OPERADOR_*` são **client roles**: cada empresa é um client (o CNPJ), e o
+role precisa estar no client da empresa dona do dado. O relatório lista os roles
+por client e, quando o role exigido existe em algum, indica em qual.
 
 ```
 ╔════════════════════════════════════════════════════════════╗
@@ -248,8 +323,9 @@ except APIError as e:
 ╠════════════════════════════════════════════════════════════╣
 ║  Endpoint : /api/v1/analises-solo/MINHA_CHAVE              ║
 ╠════════════════════════════════════════════════════════════╣
-║  Roles do usuário:                                         ║
-║    • OPERADOR_CONTRATOS                                     ║
+║  Client roles do usuário (por empresa/CNPJ):               ║
+║    12345678000190:                                         ║
+║      • OPERADOR_CONTRATOS                                  ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Roles aceitos por '/api/v1/analises-solo/MINHA_CHAVE':    ║
 ║    ✗ OPERADOR_ANALISE_SOLO                                 ║

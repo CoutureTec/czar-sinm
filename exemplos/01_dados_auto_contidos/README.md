@@ -53,6 +53,18 @@ Para forçar um ambiente específico sem editar o arquivo, passe a variável dir
 SINM_AMBIENTE=prd python exemplo.py
 ```
 
+## Versão da API e cultura-alvo
+
+```bash
+python exemplo.py --cultura milho              # cultura-alvo milho (padrão: soja)
+python exemplo.py --api-version v2             # contrato /api/v2 (padrão: v1)
+SINM_API_VERSION=v2 SINM_CULTURA_ALVO=milho python exemplo.py
+```
+
+No `v2` a gleba vai com `culturaAlvo` e a análise de solo é enviada em duas
+chamadas (química e física), com `cnpjLaboratorio` (`SINM_CNPJ_LABORATORIO`,
+padrão `SINM_CLIENT_ID`).
+
 ## Como executar
 
 ### Fluxo completo (recomendado para um primeiro teste)

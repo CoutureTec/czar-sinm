@@ -18,6 +18,89 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   qualquer código é aceito; um código fora do domínio é preservado mas gera inconsistência
   ("Camada não prevista") e não entra no cálculo; '40_060'/'60_100' geram o aviso "Camada não
   utilizada na classificação". Não enviar o sentinela '00_000'.
+- **Suporte à v6.2026 (HML 04/08/2026).**
+- `consultar_analises_disponiveis(cpf, data_referencia=None)`: lista as análises de solo
+  disponíveis para um CPF. Traz `uuidAnaliseSolo`, que permite buscar a análise completa
+  sem depender da chave de classificação. Sempre em `/api/v1`.
+- Endpoints por tipo de análise, com os modelos `AnaliseSoloQuimica` e `AnaliseSoloFisica`:
+  `cadastrar/atualizar/buscar/listar_analise(s)_solo_quimica(s)` e `..._fisica(s)`.
+- `AnaliseSolo.separar()`: divide o payload combinado em `(química, física)` para uso com
+  os endpoints por tipo.
+- `atualizar_sensoriamento_remoto(uuid, sensoriamento)` e
+  `remover_sensoriamento_remoto(uuid)`.
+- Parâmetro `api_version` em `SINMClient` (`'v1'` default, `'v2'` opt-in) e propriedade
+  `client.api_version`. Em `v2` o `cnpjLaboratorio` é obrigatório — o SDK valida antes de
+  enviar — e o payload combinado não existe (`cadastrar_analise_solo` levanta `ValueError`).
+  Gleba, operação, classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois
+  modos.
+- `AmostraQuimica.betaGlicosidase`: grafia canônica do indicador.
+- `consultar_racional`: documentação dos campos causais da v6.2026
+  (`regraDeterminante`, `limitantesPrincipais`, `papelNaNota`, `contribuicao`), com os
+  valores possíveis de cada enum.
+
+- **Gleba no contrato v2.** `cadastrar_gleba`, `buscar_gleba` e `listar_glebas` seguem
+  `api_version` (`/api/v2/glebas` no v2); novo `atualizar_gleba(uuid, dado)` (PUT).
+- `CulturaAlvo` (`soja`, `milho`, `de_nome`) e as constantes `CULTURA_SOJA`/`CULTURA_MILHO`;
+  campo `DadoGleba.culturaAlvo`. No v1 o alvo vai como última produção; no v2 vai em
+  `culturaAlvo`, obrigatório. Sem `culturaAlvo`, a produção com as duas previsões em
+  `producoes` é promovida a alvo — desde que sobre ao menos um cultivo no histórico.
+- Exemplos 01, 02 e 04: escolha da versão da API (`--api-version` / `SINM_API_VERSION`) e
+  da cultura-alvo soja ou milho (`--cultura` / `SINM_CULTURA_ALVO`; no 02 e no 04 também
+  `talhao/cultura_alvo.csv`). Novo conjunto `processo_002_milho` no exemplo 02.
+
+- `SINMClient(tamanho_pagina=100)`: itens por página nas listagens.
+- `PermissaoError.roles_por_client` e `PermissaoError.escopo` (`'client'`, `'realm'` ou `None`).
+
+### Corrigido
+- `listar_*` devolviam só a primeira página (20 itens) das listagens paginadas da API.
+  Agora percorrem todas as páginas e devolvem a lista completa
+  ([#30](https://github.com/CoutureTec/czar-sinm/issues/30)).
+- `DadoGleba.to_dict('v2')` gerava `producoes: []` quando a única produção era a
+  cultura-alvo, e a API respondia 400. Agora recusa antes da chamada com `ValueError`
+  explicando que o v2 exige ao menos um cultivo no histórico
+  ([#28](https://github.com/CoutureTec/czar-sinm/issues/28)).
+- `AnaliseSolo` (payload combinado do v1) aceitava envio sem amostras físicas, que a API
+  recusa com 400. Agora recusa antes da chamada; para enviar só a química, use
+  `AnaliseSoloQuimica` ([#29](https://github.com/CoutureTec/czar-sinm/issues/29)).
+- Relatório do 403 (`PermissaoError`) comparava os realm roles do token com os roles
+  `OPERADOR_*`, que são client roles (um client por CNPJ). Agora lista os client roles por
+  empresa e indica em quais o role exigido está
+  ([#31](https://github.com/CoutureTec/czar-sinm/issues/31)).
+- `/classificacoes` não exige role (a chave dá acesso à consulta); o relatório do 403 deixou
+  de pedir `OPERADOR_CONTRATOS` ali ([#32](https://github.com/CoutureTec/czar-sinm/issues/32)).
+- O `DELETE` de sensoriamento remoto é restrito ao realm role `ADMINISTRADOR`; o relatório do
+  403 deixou de indicar `OPERADOR_SENSORIAMENTO_REMOTO`
+  ([#33](https://github.com/CoutureTec/czar-sinm/issues/33)).
+
+### Alterado
+- Docstring de `Cultura`: os códigos de exemplo estavam errados ('018' não é milho). Agora:
+  '001' soja grão, '002' milho grão, '072' milho silagem, '085' trigo grão.
+- Payloads passam a enviar `cnpjPropriedade` (nome canônico) em vez da chave legada `cnpj`,
+  em análise de solo e sensoriamento remoto. Todos os ambientes já aceitam a canônica.
+- Em `v1`, `betaGlicosidase` é enviado junto com o nome legado `betaGlicosidade`, porque os
+  ambientes em produção ainda só conhecem a grafia antiga. Em `v2` só a canônica é enviada.
+- Exemplos `05_racional` e `06_racional_por_codigo`: passam a exibir a leitura causal
+  (regra determinante, limitantes, papel e contribuição de cada indicador). O mapa de
+  `efeitoNaNota` estava desatualizado — usava valores que a API nunca retornou.
+
+### Depreciado
+- `AmostraQuimica.betaGlicosidade` (erro de grafia): use `betaGlicosidase`. Informar as duas
+  com valores diferentes é erro; informar só a antiga emite `DeprecationWarning`.
+- `buscar_analise_solo(uuid)`: a rota `/api/v1/analises-solo/{uuid}` não existe em nenhum
+  ambiente — o método sempre falhou. Agora emite `DeprecationWarning` e delega para
+  `buscar_analise_solo_quimica`.
+- `remover_sensoriamento_remoto`: a remoção é restrita a administradores na API e responde
+  403 para integradores. Emite `DeprecationWarning`; para corrigir um sensoriamento, use
+  `atualizar_sensoriamento_remoto` ([#33](https://github.com/CoutureTec/czar-sinm/issues/33)).
+- Campo `efeitoNaNota` do racional: continua na resposta, mas compara o indicador com a
+  nota *final*, então indicadores que causaram um teto saem como `NEUTRO`. Prefira
+  `papelNaNota` + `contribuicao`.
+
+### Removido
+- `cadastrar_operacao` e o modelo `DadosInput`: a API não tem mais o fluxo combinado por
+  UUIDs. A classificação de nível de manejo sai do envio da gleba, da análise de solo e do
+  sensoriamento, e é consultada com `consultar_classificacao(chave)`.
+
 ## [0.3.0.rc2] — 2026-06-16
 
 ## [0.3.0.rc1] — 2026-06-16

@@ -9,9 +9,14 @@ Uso:
     python example.py --dados dados/processo_001 --acao cadastraSensoriamentoRemoto --chave_nm CHAVE
     python example.py --dados dados/processo_001 --acao consultaClassificacaoNM  --chave_nm CHAVE
     python example.py --dados dados/processo_001 --salvarRetornos                    # salva retornos em JSON
+    python example.py --dados dados/processo_001 --cultura milho                     # troca a cultura-alvo
+    python example.py --dados dados/processo_001 --api-version v2                    # contrato /api/v2
 
 Credenciais via arquivo .env (cp ../env.example .env).
 Os resultados de cada execução são gravados em <diretorio>/resultado.csv.
+
+A cultura a classificar (soja ou milho) vem de <diretorio>/talhao/cultura_alvo.csv;
+producoes.csv traz só o histórico de cultivos.
 """
 
 import argparse
@@ -29,7 +34,7 @@ load_dotenv()
 from czarsinm import (
     SINMClient,
     DadoGleba, Produtor, Propriedade, Talhao,
-    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura,
+    Manejo, Operacao, TipoOperacao, CoberturaSolo, Producao, Cultura, CulturaAlvo,
     AnaliseSolo, Amostra, AmostraFisica,
     SensoriamentoRemoto, Indice,
     InterpretacaoCoberturaSolo, InterpretacaoCultura, InterpretacaoManejo,
@@ -82,12 +87,26 @@ parser.add_argument(
     default=False,
     help="Se informado, salva o retorno de cada chamada à API em arquivos JSON no diretório de dados.",
 )
+parser.add_argument(
+    "--api-version",
+    choices=("v1", "v2"),
+    default=os.getenv("SINM_API_VERSION", "v1"),
+    help="Contrato da API (padrão: SINM_API_VERSION ou v1).",
+)
+parser.add_argument(
+    "--cultura",
+    choices=("soja", "milho"),
+    default=os.getenv("SINM_CULTURA_ALVO") or None,
+    help="Sobrescreve a cultura de talhao/cultura_alvo.csv (padrão: SINM_CULTURA_ALVO).",
+)
 args = parser.parse_args()
 
 DIRETORIO = Path(args.dados)
 ACAO = args.acao
 CHAVE_NM_ARG = args.chave_nm
 SALVAR_RETORNOS = args.salvarRetornos
+API_VERSION = args.api_version
+CULTURA_ARG = args.cultura
 
 if not DIRETORIO.is_dir():
     parser.error(f"Diretório não encontrado: {DIRETORIO}")
@@ -113,6 +132,8 @@ BACKEND_URL    = os.getenv("SINM_BACKEND_URL")
 KEYCLOAK_URL   = os.getenv("SINM_KEYCLOAK")
 KEYCLOAK_REALM = os.getenv("SINM_KEYCLOAK_REALM")
 GRANT_TYPE     = os.getenv("SINM_GRANT_TYPE") or None
+# Obrigatório no /api/v2 para análise de solo, se não vier em analise_solo.csv.
+CNPJ_LABORATORIO = os.getenv("SINM_CNPJ_LABORATORIO") or CLIENT_ID
 
 # --------------------------------------------------------------------------
 # Client
@@ -127,12 +148,14 @@ client = SINMClient(
     keycloak_url=KEYCLOAK_URL,
     keycloak_realm=KEYCLOAK_REALM,
     grant_type=GRANT_TYPE,
+    api_version=API_VERSION,
 )
 
 print("\n=== Autenticação ===")
 roles        = client.roles
 client_roles = client.client_roles
 print(f"Usuário     : {USUARIO}")
+print(f"API         : {API_VERSION}")
 print(f"Realm roles : {roles}")
 for _client_id, _cr in client_roles.items():
     print(f"Papeis de acesso no client {_client_id}:")
@@ -225,7 +248,29 @@ def ler_producoes(d):
     return result
 
 
+def ler_cultura_alvo(d):
+    """Cultura a classificar (soja ou milho), de talhao/cultura_alvo.csv.
+
+    Sem o arquivo, a cultura-alvo é a produção com previsão de plantio e colheita
+    em producoes.csv (forma do v1) — o SDK a promove a culturaAlvo no v2.
+    """
+    path = d / "talhao" / "cultura_alvo.csv"
+    if not path.exists():
+        return None
+    row = _csv(path)[0]
+    ilp_raw = row.get("ilp", "").strip()
+    return CulturaAlvo.de_nome(
+        CULTURA_ARG or row["cultura"],
+        row["data_previsao_plantio"],
+        row["data_previsao_colheita"],
+        ilp=_bool(ilp_raw) if ilp_raw else False,
+    )
+
+
 def ler_dado_gleba(d):
+    cultura_alvo = ler_cultura_alvo(d)
+    if cultura_alvo:
+        print(f"  Cultura-alvo: {CULTURA_ARG or _csv(d / 'talhao' / 'cultura_alvo.csv')[0]['cultura']}")
     return DadoGleba(
         produtor=ler_produtor(d),
         propriedade=ler_propriedade(d),
@@ -233,6 +278,7 @@ def ler_dado_gleba(d):
         manejos=ler_manejos(d),
         coberturas=ler_coberturas(d),
         producoes=ler_producoes(d),
+        culturaAlvo=cultura_alvo,
     )
 
 
@@ -275,6 +321,7 @@ def ler_analise_solo(d):
     return AnaliseSolo(
         cpfProdutor=row["cpf_produtor"],
         cnpjPropriedade=row["cnpj"],
+        cnpjLaboratorio=row.get("cnpj_laboratorio") or CNPJ_LABORATORIO,
         amostrasQuimicas=amostras_quimicas,
         amostrasFisicas=amostras_fisicas,
     )
@@ -431,9 +478,18 @@ def cadastra_analise_solo(chave_nm):
     print("\n=== Cadastrando análise de solo ===")
     try:
         t0 = time.perf_counter()
-        resp = client.cadastrar_analise_solo(
-            ler_analise_solo(DIRETORIO), chave_classificacao_nm=chave_nm
-        )
+        analise = ler_analise_solo(DIRETORIO)
+        if API_VERSION == "v1":
+            # Payload combinado (química + física): só existe no /api/v1.
+            resp = client.cadastrar_analise_solo(analise, chave_classificacao_nm=chave_nm)
+        else:
+            # No /api/v2 cada metade vai na sua rota.
+            quimica, fisica = analise.separar()
+            resp = {"quimica": client.cadastrar_analise_solo_quimica(
+                quimica, chave_classificacao_nm=chave_nm)}
+            if fisica:
+                resp["fisica"] = client.cadastrar_analise_solo_fisica(
+                    fisica, chave_classificacao_nm=chave_nm)
         elapsed = time.perf_counter() - t0
         print("Análise de solo cadastrada com sucesso!")
         print(f"  UUID: {resp.get('uuid')}")

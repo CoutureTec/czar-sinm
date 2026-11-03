@@ -12,37 +12,76 @@ Fluxo principal:
 from __future__ import annotations
 
 import logging
+import re
+import warnings
 from typing import Optional
 
 import requests
 
 from .auth import KeycloakAuth
 from .exceptions import APIError, NotFoundError, PermissaoError, ValidationError
-from .models import DadoGleba, AnaliseSolo, SensoriamentoRemoto, DadosInput
+from .models import (
+    AnaliseSolo,
+    AnaliseSoloFisica,
+    AnaliseSoloQuimica,
+    DadoGleba,
+    SensoriamentoRemoto,
+)
 
 logger = logging.getLogger(__name__)
 
 # URLs padrão por ambiente
-API_URLS = {    
+API_URLS = {
     "hml": "https://www.zarcnm-h.cnptia.embrapa.br",
     "prd": "https://www.zarcnm.cnptia.embrapa.br",
 }
 
-# Roles exigidos por prefixo de endpoint (ordem: mais específico primeiro)
+API_VERSIONS = ("v1", "v2")
+"""Versões de contrato da API que o cliente sabe endereçar.
+
+O ``v2`` cobre gleba (com ``culturaAlvo`` declarada), análise de solo (por tipo) e
+sensoriamento remoto. Classificação e análises disponíveis existem só no ``v1`` e
+continuam sendo chamadas lá, qualquer que seja a versão configurada.
+"""
+
+ESCOPO_CLIENT = "client"
+"""Role de client: atribuído por empresa (client = CNPJ) e exigido na empresa dona do dado."""
+ESCOPO_REALM = "realm"
+"""Role de realm: vale para o sistema todo (ex.: ``ADMINISTRADOR``)."""
+
+# Roles exigidos por método e sufixo de endpoint, já sem o prefixo /api/vN
+# (ordem: mais específico primeiro; método None casa qualquer método).
+# /classificacoes não aparece: exige só autenticação — a chave dá acesso à consulta.
 _ENDPOINT_ROLES = [
-    ("/api/v1/glebas",                  ["OPERADOR_CONTRATOS"]),
-    ("/api/v1/operacoes",               ["OPERADOR_CONTRATOS"]),
-    ("/api/v1/classificacoes",          ["OPERADOR_CONTRATOS",]),
-    ("/api/v1/analises-solo",           ["OPERADOR_ANALISE_SOLO"]),
-    ("/api/v1/sensoriamentos-remotos",  ["OPERADOR_SENSORIAMENTO_REMOTO"]),
+    ("DELETE", "/sensoriamentos-remotos",    ["ADMINISTRADOR"], ESCOPO_REALM),
+    (None,     "/glebas",                    ["OPERADOR_CONTRATOS"], ESCOPO_CLIENT),
+    (None,     "/analises-solo/disponiveis", ["OPERADOR_ANALISE_SOLO", "OPERADOR_CONTRATOS"], ESCOPO_CLIENT),
+    (None,     "/analises-solo",             ["OPERADOR_ANALISE_SOLO"], ESCOPO_CLIENT),
+    (None,     "/sensoriamentos-remotos",    ["OPERADOR_SENSORIAMENTO_REMOTO"], ESCOPO_CLIENT),
 ]
 
+_PREFIXO_VERSAO = re.compile(r"^/api/v\d+")
 
-def _roles_para_endpoint(path: str) -> list:
-    for prefix, roles in _ENDPOINT_ROLES:
-        if path.startswith(prefix):
-            return roles
-    return []
+
+def _regra_do_endpoint(path: str, metodo: Optional[str] = None) -> tuple:
+    """``(roles, escopo)`` exigidos pelo endpoint, independentemente da versão do contrato.
+
+    A autorização é idêntica no v1 e no v2 (só o payload muda), então o prefixo
+    ``/api/vN`` é descartado antes de casar o sufixo. Endpoint sem regra devolve
+    ``([], None)``: exige só autenticação.
+    """
+    sufixo = _PREFIXO_VERSAO.sub("", path, count=1)
+    for metodo_regra, prefix, roles, escopo in _ENDPOINT_ROLES:
+        if metodo_regra and metodo_regra != (metodo or "").upper():
+            continue
+        if sufixo.startswith(prefix):
+            return roles, escopo
+    return [], None
+
+
+def _roles_para_endpoint(path: str, metodo: Optional[str] = None) -> list:
+    """Roles exigidos pelo endpoint (ver :func:`_regra_do_endpoint`)."""
+    return _regra_do_endpoint(path, metodo)[0]
 
 
 def _extrair_lista(response) -> list:
@@ -106,6 +145,8 @@ class SINMClient:
         proxies: Optional[dict] = None,
         timeout: int = 60,
         grant_type: Optional[str] = None,
+        api_version: str = "v1",
+        tamanho_pagina: int = 100,
     ):
         """
         Parameters
@@ -138,12 +179,33 @@ class SINMClient:
             Proxies para requests. Ex: {'https': 'http://proxy.cnptia.embrapa.br:3128'}
         timeout:
             Timeout em segundos para chamadas à API.
+        api_version:
+            Contrato da API para gleba, análise de solo e sensoriamento remoto:
+            'v1' (padrão, contrato congelado — aceita os nomes legados e infere a
+            cultura-alvo da produção atual) ou 'v2' (contrato limpo: só nomes
+            canônicos, ``cnpjLaboratorio`` obrigatório e ``culturaAlvo`` declarada
+            na gleba). Classificação e análises disponíveis não têm v2 e são
+            sempre chamadas no /api/v1. Os modelos serializam para os dois
+            contratos, então trocar a versão não exige mudar o código que monta
+            os payloads — exceto o cadastro combinado de análise de solo, que só
+            existe no v1.
+        tamanho_pagina:
+            Itens pedidos por página nas listagens. Os métodos ``listar_*``
+            percorrem todas as páginas e devolvem a lista completa; o tamanho só
+            muda quantas requisições são feitas.
         """
         if ambiente not in API_URLS and base_url is None:
             raise ValueError(
                 f"Ambiente '{ambiente}' não reconhecido. "
                 "Para ambientes customizados, informe 'base_url' "
                 "(ou defina SINM_BACKEND_URL no arquivo .env)."
+            )
+        if tamanho_pagina < 1:
+            raise ValueError("tamanho_pagina deve ser maior que zero.")
+        if api_version not in API_VERSIONS:
+            raise ValueError(
+                f"api_version '{api_version}' não reconhecida. "
+                f"Use uma de: {', '.join(API_VERSIONS)}."
             )
         self._auth = KeycloakAuth(
             client_id=client_id,
@@ -159,7 +221,18 @@ class SINMClient:
         self._base_url = (base_url or API_URLS.get(ambiente, API_URLS["hml"])).rstrip("/")
         self._proxies = proxies
         self._timeout = timeout
+        self._api_version = api_version
+        self._tamanho_pagina = tamanho_pagina
         self._session = requests.Session()
+
+    @property
+    def api_version(self) -> str:
+        """Contrato usado nas rotas de gleba, análise de solo e sensoriamento ('v1' ou 'v2')."""
+        return self._api_version
+
+    def _rota(self, recurso: str) -> str:
+        """Path do recurso na versão configurada. Ex.: '/analises-solo' → '/api/v2/analises-solo'."""
+        return f"/api/{self._api_version}{recurso}"
 
     @property
     def roles(self) -> list:
@@ -180,7 +253,11 @@ class SINMClient:
 
     def cadastrar_gleba(self, dado: DadoGleba) -> dict:
         """
-        Cadastra um talhão/gleba na API.
+        Cadastra um talhão/gleba na API, na versão configurada.
+
+        No ``v2`` a cultura a classificar vai em ``culturaAlvo`` (soja ou milho
+        grão); no ``v1`` ela é a produção com previsão de plantio e colheita. O
+        modelo converte entre as duas formas — ver :class:`DadoGleba`.
 
         Returns
         -------
@@ -190,20 +267,28 @@ class SINMClient:
 
         Raises
         ------
+        ValueError
+            No ``v2``, se a gleba não tiver cultura-alvo — antes da chamada.
         ValidationError
-            Se o payload enviado contiver dados inválidos (HTTP 400/422).
+            Se o payload enviado contiver dados inválidos (HTTP 400/422). No
+            ``v2`` também quando a operadora é incoerente (422), caso em que o
+            ``v1`` grava e sinaliza ``RN23``.
         APIError
             Para outros erros HTTP.
         """
-        return self._post("/api/v1/glebas", dado.to_dict())
+        return self._post(self._rota("/glebas"), dado.to_dict(self._api_version))
+
+    def atualizar_gleba(self, uuid_gleba: str, dado: DadoGleba) -> dict:
+        """Substitui os dados de uma gleba já cadastrada, na versão configurada."""
+        return self._put(f"{self._rota('/glebas')}/{uuid_gleba}", dado.to_dict(self._api_version))
 
     def buscar_gleba(self, uuid_gleba: str) -> dict:
         """Busca os dados de uma gleba pelo UUID."""
-        return self._get(f"/api/v1/glebas/{uuid_gleba}")
+        return self._get(f"{self._rota('/glebas')}/{uuid_gleba}")
 
     def listar_glebas(self) -> list:
         """Lista as glebas do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/glebas"))
+        return self._listar(self._rota("/glebas"))
 
     # ------------------------------------------------------------------
     # Análise de Solo
@@ -215,7 +300,12 @@ class SINMClient:
         chave_classificacao_nm: Optional[str] = None,
     ) -> dict:
         """
-        Cadastra uma análise de solo.
+        Cadastra uma análise de solo pelo payload **combinado** (química + física).
+
+        Fachada legada do ``/api/v1``: cria as duas metades — química e física —
+        numa única transação. Mantida sem prazo de remoção, mas não existe no v2:
+        com ``api_version='v2'`` use :meth:`cadastrar_analise_solo_quimica` e
+        :meth:`cadastrar_analise_solo_fisica` (ou ``AnaliseSolo.separar()``).
 
         Parameters
         ----------
@@ -229,21 +319,158 @@ class SINMClient:
         Returns
         -------
         dict
-            Resumo da análise cadastrada.
+            Resumo das duas metades cadastradas (``{'quimica': ..., 'fisica': ...}``).
         """
+        if self._api_version != "v1":
+            raise ValueError(
+                "O cadastro combinado existe apenas no /api/v1. Com api_version='v2' "
+                "use cadastrar_analise_solo_quimica/cadastrar_analise_solo_fisica."
+            )
+        path = "/api/v1/analises-solo"
         if chave_classificacao_nm:
-            path = f"/api/v1/analises-solo/{chave_classificacao_nm}"
-        else:
-            path = "/api/v1/analises-solo"
-        return self._post(path, analise.to_dict())
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict("v1"))
 
     def buscar_analise_solo(self, uuid_analise: str) -> dict:
-        """Busca uma análise de solo pelo UUID."""
-        return self._get(f"/api/v1/analises-solo/{uuid_analise}")
+        """DEPRECIADO — use :meth:`buscar_analise_solo_quimica` ou
+        :meth:`buscar_analise_solo_fisica`.
+
+        A consulta de análise de solo é **por tipo**: não existe (nem existia)
+        ``GET /analises-solo/{uuid}``. Este método delega para a metade química,
+        que é o registro primário criado pelo cadastro combinado.
+        """
+        warnings.warn(
+            "buscar_analise_solo está depreciado: a consulta é por tipo. Use "
+            "buscar_analise_solo_quimica ou buscar_analise_solo_fisica.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.buscar_analise_solo_quimica(uuid_analise)
 
     def listar_analises_solo(self) -> list:
-        """Lista as análises de solo do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/analises-solo"))
+        """Lista as análises de solo (metade química) do usuário autenticado.
+
+        No ``/api/v1`` a rota combinada continua respondendo por compatibilidade;
+        prefira :meth:`listar_analises_solo_quimicas` / :meth:`listar_analises_solo_fisicas`.
+        """
+        if self._api_version != "v1":
+            return self.listar_analises_solo_quimicas()
+        return self._listar("/api/v1/analises-solo")
+
+    # -- Análise de solo por tipo (química / física) --------------------
+
+    def cadastrar_analise_solo_quimica(
+        self,
+        analise: AnaliseSoloQuimica,
+        chave_classificacao_nm: Optional[str] = None,
+    ) -> dict:
+        """Cadastra uma análise de solo **química**.
+
+        Sem ``chave_classificacao_nm`` o vínculo é feito pelo CPF do produtor no
+        payload. No contrato v2 o ``cnpjLaboratorio`` é obrigatório — o modelo
+        levanta ``ValueError`` antes da chamada, em vez de deixar a API responder 400.
+        """
+        path = self._rota("/analises-solo/quimica")
+        if chave_classificacao_nm:
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict(self._api_version))
+
+    def atualizar_analise_solo_quimica(self, uuid_analise: str, analise: AnaliseSoloQuimica) -> dict:
+        """Substitui os dados de uma análise de solo química já cadastrada."""
+        return self._put(
+            f"{self._rota('/analises-solo/quimica')}/{uuid_analise}",
+            analise.to_dict(self._api_version),
+        )
+
+    def buscar_analise_solo_quimica(self, uuid_analise: str) -> dict:
+        """Busca uma análise de solo química pelo UUID.
+
+        Quem cadastrou a análise recebe a visão completa; quem apenas opera a
+        classificação recebe a visão parcial (sem amostras nem laboratório). O uuid
+        de uma análise física neste endpoint responde 404.
+        """
+        return self._get(f"{self._rota('/analises-solo/quimica')}/{uuid_analise}")
+
+    def listar_analises_solo_quimicas(self) -> list:
+        """Lista as análises de solo químicas do usuário autenticado."""
+        return self._listar(self._rota("/analises-solo/quimica"))
+
+    def cadastrar_analise_solo_fisica(
+        self,
+        analise: AnaliseSoloFisica,
+        chave_classificacao_nm: Optional[str] = None,
+    ) -> dict:
+        """Cadastra uma análise de solo **física**.
+
+        Sem ``chave_classificacao_nm`` o vínculo é feito pelo CPF do produtor no
+        payload. No contrato v2 o ``cnpjLaboratorio`` é obrigatório.
+        """
+        path = self._rota("/analises-solo/fisica")
+        if chave_classificacao_nm:
+            path = f"{path}/{chave_classificacao_nm}"
+        return self._post(path, analise.to_dict(self._api_version))
+
+    def atualizar_analise_solo_fisica(self, uuid_analise: str, analise: AnaliseSoloFisica) -> dict:
+        """Substitui os dados de uma análise de solo física já cadastrada."""
+        return self._put(
+            f"{self._rota('/analises-solo/fisica')}/{uuid_analise}",
+            analise.to_dict(self._api_version),
+        )
+
+    def buscar_analise_solo_fisica(self, uuid_analise: str) -> dict:
+        """Busca uma análise de solo física pelo UUID.
+
+        Mesmas regras da química: visão completa para quem cadastrou, parcial para
+        quem só opera a classificação. O uuid de uma análise química aqui responde 404.
+        """
+        return self._get(f"{self._rota('/analises-solo/fisica')}/{uuid_analise}")
+
+    def listar_analises_solo_fisicas(self) -> list:
+        """Lista as análises de solo físicas do usuário autenticado."""
+        return self._listar(self._rota("/analises-solo/fisica"))
+
+    # -- Disponibilidade por CPF do produtor ----------------------------
+
+    def consultar_analises_disponiveis(
+        self,
+        cpf: str,
+        data_referencia: Optional[str] = None,
+    ) -> dict:
+        """
+        Diz **quais análises de solo o produtor já tem e até quando valem**, sem
+        expor o conteúdo.
+
+        Responde duas listas independentes — ``analisesQuimicas`` e
+        ``analisesFisicas`` —, cada item com ``uuidAnaliseSolo``, ``validaAte``,
+        ``valida`` e ``motivoInvalidade`` (``RN15`` quando expirada). Ordenadas da
+        validade mais distante para a mais próxima; as expiradas também vêm, com
+        ``valida=false``.
+
+        Com o ``uuidAnaliseSolo`` em mãos, consulte a análise em
+        :meth:`buscar_analise_solo_quimica` ou :meth:`buscar_analise_solo_fisica`,
+        **conforme a lista de onde o item veio** — o uuid de uma no endpoint da outra
+        responde 404. O uuid identifica, não autoriza: consultar a análise segue
+        exigindo ``OPERADOR_ANALISE_SOLO`` na operadora da classificação.
+
+        Só existe no ``/api/v1``: é chamada nessa rota mesmo com ``api_version='v2'``.
+
+        Parameters
+        ----------
+        cpf:
+            CPF do produtor (somente dígitos). A consulta não é restrita à sua
+            carteira de clientes.
+        data_referencia:
+            Data ('YYYY-MM-DD') usada para decidir a validade. Default: hoje.
+
+        Returns
+        -------
+        dict
+            ``{'analisesQuimicas': [...], 'analisesFisicas': [...]}``
+        """
+        params = {"cpf": cpf}
+        if data_referencia:
+            params["dataReferencia"] = data_referencia
+        return self._get("/api/v1/analises-solo/disponiveis", params=params)
 
     # ------------------------------------------------------------------
     # Sensoriamento Remoto
@@ -271,42 +498,43 @@ class SINMClient:
             Resumo do sensoriamento cadastrado.
         """
         return self._post(
-            f"/api/v1/sensoriamentos-remotos/{chave_classificacao_nm}",
-            sensoriamento.to_dict(),
+            f"{self._rota('/sensoriamentos-remotos')}/{chave_classificacao_nm}",
+            sensoriamento.to_dict(self._api_version),
+        )
+
+    def atualizar_sensoriamento_remoto(
+        self,
+        uuid_sensoriamento: str,
+        sensoriamento: SensoriamentoRemoto,
+    ) -> dict:
+        """Substitui os dados de um sensoriamento remoto já cadastrado."""
+        return self._put(
+            f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}",
+            sensoriamento.to_dict(self._api_version),
         )
 
     def buscar_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
         """Busca um sensoriamento remoto pelo UUID."""
-        return self._get(f"/api/v1/sensoriamentos-remotos/{uuid_sensoriamento}")
+        return self._get(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
 
     def listar_sensoriamentos_remotos(self) -> list:
         """Lista os sensoriamentos do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/sensoriamentos-remotos"))
+        return self._listar(self._rota("/sensoriamentos-remotos"))
 
-    # ------------------------------------------------------------------
-    # Operação (fluxo combinado por UUIDs)
-    # ------------------------------------------------------------------
+    def remover_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
+        """DEPRECIADO — uso administrativo: a API só aceita a remoção com o realm
+        role ``ADMINISTRADOR``; para integradores responde 403 (:class:`PermissaoError`).
 
-    def cadastrar_operacao(self, dados: DadosInput) -> dict:
+        Para corrigir um sensoriamento, use :meth:`atualizar_sensoriamento_remoto`.
+        Remove um sensoriamento remoto pelo UUID (204 → dict vazio).
         """
-        Executa a operação de classificação usando recursos já cadastrados.
-
-        Recebe os UUIDs de uma gleba, análise de solo e sensoriamento remoto
-        previamente registrados, junto com a produção atual e anteriores, e
-        dispara o processamento da classificação de nível de manejo.
-
-        Parameters
-        ----------
-        dados:
-            DadosInput com uuidGleba, uuidAnaliseSolo, uuidSensoriamentoRemoto,
-            producaoAtual e producoesAnteriores.
-
-        Returns
-        -------
-        dict
-            Resumo da operação (OperacaoNivelManejoResumoModel).
-        """
-        return self._post("/api/v1/operacoes", dados.to_dict())
+        warnings.warn(
+            "remover_sensoriamento_remoto está depreciado: a remoção é restrita a "
+            "ADMINISTRADOR na API. Para corrigir, use atualizar_sensoriamento_remoto.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._delete(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
 
     # ------------------------------------------------------------------
     # Classificação Nível de Manejo
@@ -343,8 +571,31 @@ class SINMClient:
 
         A projeção depende dos papéis do usuário autenticado: com
         OPERADOR_ANALISE_SOLO na empresa operadora, vêm valores/faixas/scores
-        parciais (projeção completa); sem ele, só nome, origem e efeito na nota
-        (projeção compacta).
+        parciais (projeção completa); sem ele, só os campos de causa e o efeito na
+        nota (projeção compacta).
+
+        Leitura causal (v6.2026)
+        ------------------------
+        A nota nem sempre vem da média: regras de teto podem fixá-la. Quatro campos
+        dizem *qual* fator limitou:
+
+        - ``regraDeterminante`` (na classificação) — regra que fixou a nota:
+          ``DOIS_OU_MAIS_NM1``, ``DOIS_OU_MAIS_NM2``, ``UM_NM1_UM_NM2``,
+          ``SATURACAO_ALUMINIO_CRITICA``, ``SATURACAO_ALUMINIO_ALTA``,
+          ``SOJA_EM_SUCESSAO``, ``LEGUMINOSAS_EM_SUCESSAO``,
+          ``DECLIVIDADE_ACENTUADA``, ``TETO_AMBIENTAL``, ou ``BANDA_DA_MEDIA``
+          quando a nota veio mesmo da média.
+        - ``limitantesPrincipais`` (na classificação) — nomes dos indicadores que
+          foram o gatilho da regra. Vazio quando não há limitante (ex.: NM4).
+        - ``papelNaNota`` (por indicador) — ``LIMITANTE_PRINCIPAL``, ``LIMITANTE``,
+          ``FAVORAVEL`` ou ``ALINHADO``. Vem nas duas projeções.
+        - ``contribuicao`` (por indicador) — ``ACIMA``, ``NA_MEDIA`` ou ``ABAIXO``
+          em relação ao score médio. Só na projeção completa.
+
+        ``efeitoNaNota`` (``ELEVOU``/``REBAIXOU``/``NEUTRO``) continua na resposta
+        com o mesmo comportamento, porém **depreciado**: ele compara o indicador com
+        a nota *final*, então quando a nota é travada por um teto os indicadores que
+        a causaram saem como ``NEUTRO``. Prefira ``papelNaNota`` + ``contribuicao``.
 
         Parameters
         ----------
@@ -364,12 +615,32 @@ class SINMClient:
         return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}/racional")
 
     def listar_classificacoes(self) -> list:
-        """Lista todas as classificações do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/classificacoes"))
+        """Lista todas as classificações do usuário autenticado, da mais recente para a mais antiga."""
+        return self._listar("/api/v1/classificacoes")
 
     # ------------------------------------------------------------------
     # HTTP helpers
     # ------------------------------------------------------------------
+
+    def _listar(self, path: str, params: Optional[dict] = None) -> list:
+        """GET paginado: percorre todas as páginas e devolve os itens concatenados.
+
+        A API pagina as listagens (página padrão de 20 itens). Resposta sem
+        metadados de página (lista simples) é devolvida como veio.
+        """
+        itens: list = []
+        pagina = 0
+        while True:
+            consulta = {**(params or {}), "page": pagina, "size": self._tamanho_pagina}
+            resp = self._get(path, params=consulta)
+            lote = _extrair_lista(resp)
+            if not isinstance(lote, list):
+                return lote
+            itens.extend(lote)
+            info = resp.get("page") if isinstance(resp, dict) else None
+            if not isinstance(info, dict) or pagina + 1 >= int(info.get("totalPages") or 0):
+                return itens
+            pagina += 1
 
     def _headers(self) -> dict:
         return {
@@ -392,13 +663,29 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "POST")
 
-    def _get(self, path: str):
+    def _put(self, path: str, payload: dict) -> dict:
         url = self._base_url + path
-        logger.debug("GET %s", url)
+        logger.debug("PUT %s", url)
         try:
-            resp = self._session.get(
+            resp = self._session.put(
+                url,
+                json=payload,
+                headers=self._headers(),
+                timeout=self._timeout,
+                proxies=self._proxies,
+            )
+        except requests.RequestException as exc:
+            raise APIError(0, f"Erro de conexão: {exc}") from exc
+
+        return self._handle_response(resp, path, "PUT")
+
+    def _delete(self, path: str) -> dict:
+        url = self._base_url + path
+        logger.debug("DELETE %s", url)
+        try:
+            resp = self._session.delete(
                 url,
                 headers=self._headers(),
                 timeout=self._timeout,
@@ -407,9 +694,25 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "DELETE")
 
-    def _handle_response(self, resp: requests.Response, path: str = ""):
+    def _get(self, path: str, params: Optional[dict] = None):
+        url = self._base_url + path
+        logger.debug("GET %s params=%s", url, params)
+        try:
+            resp = self._session.get(
+                url,
+                params=params,
+                headers=self._headers(),
+                timeout=self._timeout,
+                proxies=self._proxies,
+            )
+        except requests.RequestException as exc:
+            raise APIError(0, f"Erro de conexão: {exc}") from exc
+
+        return self._handle_response(resp, path, "GET")
+
+    def _handle_response(self, resp: requests.Response, path: str = "", metodo: str = ""):
         logger.debug("Response [%s] %s: %s", resp.status_code, path, resp.text)
 
         if resp.status_code in (200, 201, 204):
@@ -429,15 +732,16 @@ class SINMClient:
             body["raw"] = raw
 
         if resp.status_code == 403:
-            roles_necessarios = _roles_para_endpoint(path)
-            roles_usuario = self._auth.roles
+            roles_necessarios, escopo = _regra_do_endpoint(path, metodo)
             raise PermissaoError(
                 resp.status_code,
                 message,
                 body,
                 endpoint=path,
-                roles_usuario=roles_usuario,
+                roles_usuario=self._auth.roles,
                 roles_necessarios=roles_necessarios,
+                roles_por_client=self._auth.client_roles,
+                escopo=escopo,
             )
         if resp.status_code == 404:
             raise NotFoundError(resp.status_code, message, body)

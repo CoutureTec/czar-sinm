@@ -57,14 +57,16 @@ dados_externos/
 ├── exemplo.py
 ├── .env                              # credenciais (não versionado)
 └── dados/
-    └── processo_001/                 # um diretório por processo/talhão
+    ├── processo_002_milho/           # mesmo talhão, cultura-alvo milho
+    └── processo_001/                 # um diretório por processo/talhão (cultura-alvo soja)
         ├── talhao/
         │   ├── produtor.csv
         │   ├── propriedade.csv
         │   ├── talhao.csv
         │   ├── manejos.csv
         │   ├── coberturas_solo.csv
-        │   └── producoes.csv
+        │   ├── producoes.csv
+        │   └── cultura_alvo.csv
         ├── analise_solo/
         │   ├── analise_solo.csv
         │   └── amostras_solo.csv
@@ -90,13 +92,14 @@ Cada subdiretório dentro de `dados/` representa um processo independente. Crie 
 | `talhao.csv` | Polígono WKT, área (ha), tipo de produtor e plantio em contorno | 1 |
 | `manejos.csv` | Operações de manejo realizadas (data, tipo e nome) | N |
 | `coberturas_solo.csv` | Avaliações de cobertura de solo (data e % palhada) | N |
-| `producoes.csv` | Safras passadas e futura (cultura, datas, ILP) | N |
+| `producoes.csv` | Histórico de cultivos (cultura, datas, ILP) | N |
+| `cultura_alvo.csv` | Cultura a classificar — `soja` ou `milho` — com as datas previstas de plantio e colheita e ILP | 1 |
 
 **`analise_solo/`** — dados da análise de solo
 
 | Arquivo | Conteúdo | Linhas |
 |---|---|---|
-| `analise_solo.csv` | Cabeçalho da análise: CPF do produtor e CNPJ | 1 |
+| `analise_solo.csv` | Cabeçalho da análise: CPF do produtor, CNPJ da propriedade e, opcionalmente, `cnpj_laboratorio` (sem ele, usa `SINM_CNPJ_LABORATORIO` ou o client ID) | 1 |
 | `amostras_solo.csv` | Amostras com dados físico-químicos do solo | N |
 
 **`sensoriamento_remoto/`** — dados de sensoriamento remoto
@@ -111,9 +114,11 @@ Cada subdiretório dentro de `dados/` representa um processo independente. Crie 
 
 > **Campos WKT** (polígono e ponto de coleta): devem ser delimitados por aspas duplas no CSV, pois contêm vírgulas. Ex: `"POLYGON ((-47.11 -22.80,...))"`.
 
-> **Campo `ilp` em `producoes.csv`**: use `true`/`false`. Deixe em branco para a safra futura (previsão).
+> **Campo `ilp`**: use `true`/`false`.
 
-> **Safra futura em `producoes.csv`**: preencha apenas `data_previsao_plantio` e `data_previsao_colheita`; deixe `data_plantio` e `data_colheita` em branco. Ao menos uma safra futura é obrigatória.
+> **Cultura-alvo em `cultura_alvo.csv`**: `cultura` aceita `soja` (Soja grão, código `001`) ou `milho` (Milho grão, código `002`) — são as culturas para as quais o nível de manejo é calculado. O SDK envia a cultura-alvo no formato de cada versão da API: no `/api/v1`, como a produção com `data_previsao_plantio` e `data_previsao_colheita`; no `/api/v2`, no campo `culturaAlvo`. Por isso `producoes.csv` traz **só o histórico** — não inclua nele a safra a classificar.
+
+> **Formato antigo**: sem `cultura_alvo.csv`, a safra a classificar é a linha de `producoes.csv` com `data_previsao_plantio` e `data_previsao_colheita` preenchidas (e as datas realizadas em branco). Continua funcionando nas duas versões da API.
 
 ## Como executar
 
@@ -124,6 +129,21 @@ python exemplo.py --dados dados/processo_001
 ```
 
 Executa as etapas em sequência — autenticação, cadastro de gleba, análise de solo, sensoriamento remoto e consulta da classificação — gravando os resultados em `dados/processo_001/resultado.csv` ao final de cada etapa.
+
+### Cultura-alvo e versão da API
+
+```bash
+# Cultura-alvo milho (dataset próprio)
+python exemplo.py --dados dados/processo_002_milho
+
+# Sobrescreve a cultura de cultura_alvo.csv sem editar o arquivo
+python exemplo.py --dados dados/processo_001 --cultura milho
+
+# Contrato /api/v2 (gleba com culturaAlvo; análise de solo química e física em rotas separadas)
+python exemplo.py --dados dados/processo_001 --api-version v2
+```
+
+Os dois também podem vir do `.env`: `SINM_CULTURA_ALVO=soja|milho` e `SINM_API_VERSION=v1|v2`.
 
 ### Ações individuais
 
