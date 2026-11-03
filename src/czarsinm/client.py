@@ -612,8 +612,8 @@ class SINMClient:
         parciais (projeção completa); sem ele, só os campos de causa e o efeito na
         nota (projeção compacta).
 
-        Leitura causal (v6.2026)
-        ------------------------
+        Leitura causal
+        --------------
         A nota nem sempre vem da média: regras de teto podem fixá-la. Quatro campos
         dizem *qual* fator limitou:
 

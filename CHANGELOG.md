@@ -62,8 +62,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Parâmetro `api_version` em `SINMClient` (`'v1'` default, `'v2'` opt-in) e propriedade
   `client.api_version`. Em `v2` o `cnpjLaboratorio` é obrigatório — o SDK valida antes de
   enviar — e o payload combinado não existe (`cadastrar_analise_solo` levanta `ValueError`).
-  Gleba, operação, classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois
-  modos.
+  Classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois modos.
 - `AmostraQuimica.betaGlicosidase`: grafia canônica do indicador.
 - `consultar_racional`: documentação dos campos causais da v6.2026
   (`regraDeterminante`, `limitantesPrincipais`, `papelNaNota`, `contribuicao`), com os

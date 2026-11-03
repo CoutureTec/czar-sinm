@@ -11,12 +11,10 @@ Contratos v1 e v2
 Os modelos serializam para os dois contratos da API. ``to_dict()`` aceita o
 parâmetro ``contrato`` (``'v1'``, o padrão, ou ``'v2'``):
 
-- **v1** — contrato congelado: aceita os nomes canônicos e os legados. Onde a
-  chave canônica ainda não existe em todos os ambientes (``betaGlicosidase``,
-  estreando na v6.2026 de homologação), o payload leva **as duas grafias** — é o
-  payload de transição recomendado pela API, e o ambiente ignora a que não
-  conhece.
-- **v2** — contrato limpo (estreia em homologação em 04/08/2026): só nomes
+- **v1** — contrato congelado: aceita os nomes canônicos e os legados. Para
+  ``betaGlicosidase`` o payload leva **as duas grafias** (canônica e legada),
+  que o v1 aceita.
+- **v2** — contrato limpo: só nomes
   canônicos e ``cnpjLaboratorio`` obrigatório. Nome legado enviado ao v2 é
   descartado **em silêncio**, sem erro — por isso os modelos nunca os emitem no v2.
   Na gleba, a cultura a classificar é declarada em ``culturaAlvo`` (soja ou milho
@@ -152,7 +150,8 @@ class Operacao:
 @dataclass
 class TipoOperacao:
     tipo: str
-    """Tipo de operação. Ex: 'ARAÇÃO', 'GRADAGEM', 'PLANTIO_DIRETO'."""
+    """Tipo de operação. Ex: 'ARAÇÃO', 'GRADAGEM', 'SUBSOLAGEM', 'ESCARIFICAÇÃO'.
+    Consulte os valores possíveis na documentação (tabela `tipo_operacao`)."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -463,9 +462,9 @@ class AmostraQuimica:
     arilsulfatase: Optional[float] = None
     """Arilsulfatase em nmol/g/h (0–800). Opcional."""
     betaGlicosidase: Optional[float] = None
-    """Beta-glicosidase em nmol/g/h (0–500). Opcional. Grafia canônica desde a
-    v6.2026 — a antiga `betaGlicosidade` (erro de grafia) segue aceita no envio ao
-    /api/v1, porém DEPRECIADA, e é ignorada pelo /api/v2."""
+    """Beta-glicosidase em nmol/g/h (0–500). Opcional. Grafia canônica — a
+    antiga `betaGlicosidade` (erro de grafia) segue aceita no envio ao /api/v1,
+    porém DEPRECIADA, e é ignorada pelo /api/v2."""
     betaGlicosidade: Optional[float] = None
     """DEPRECIADO — use `betaGlicosidase`. Mantido para não quebrar código existente:
     se informado sozinho, alimenta o campo canônico (com DeprecationWarning)."""
@@ -498,8 +497,8 @@ class AmostraQuimica:
         _validar_contrato(contrato)
         d = _remove_none(asdict(self))
         # A grafia é reconciliada em __post_init__; a serialização decide só quais
-        # chaves vão no fio. O v1 leva as duas (a produção ainda só conhece a
-        # legada); o v2 aceita apenas a canônica e descartaria a legada em silêncio.
+        # chaves vão no fio. O v1 leva as duas (aceita ambas); o v2
+        # aceita apenas a canônica e descartaria a legada em silêncio.
         d.pop("betaGlicosidade", None)
         d.pop("betaGlicosidase", None)
         if self.betaGlicosidase is not None:
