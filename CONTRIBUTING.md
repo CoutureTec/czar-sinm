@@ -47,8 +47,10 @@ src/czarsinm/
 ├── models.py       # Dataclasses dos payloads
 └── exceptions.py   # Hierarquia de erros
 exemplos/
-├── dados_auto_contidos/   # Exemplo com dados embutidos no script
-└── dados_externos/        # Exemplo com dados lidos de CSVs
+├── exemplo_v1.py          # Fluxo completo no /api/v1
+├── exemplo_v2.py          # Fluxo completo no /api/v2
+├── fonte_dados.py         # Fontes de dados (JSON, CSV) → modelos do SDK
+└── dados/                 # Os mesmos dados em glebas.json e csv/
 ```
 
 ## Convenções

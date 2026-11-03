@@ -7,6 +7,14 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+### Alterado
+- Exemplos refeitos: `exemplos/exemplo_v1.py` e `exemplos/exemplo_v2.py` cobrem o fluxo
+  completo (autenticação, gleba, análise de solo química e física, sensoriamento remoto,
+  classificação e racional) em cada contrato, lendo os dados de uma fonte configurável —
+  `dados/glebas.json` ou as tabelas de `dados/csv/` (`SINM_FONTE`). Os exemplos antigos
+  (01 a 06) foram removidos; os workflows "Validar Acessos" e "Racional do Cálculo" usam os
+  novos scripts (`--autenticar` e `--chave`).
+
 ## [0.4.0] — 2026-11-03
 
 ### Adicionado

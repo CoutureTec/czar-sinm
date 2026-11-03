@@ -1,13 +1,12 @@
-name: Racional do Cálculo (Exemplo 06)
+name: Racional do Cálculo
 
-# Executa exemplos/06_racional_por_codigo/exemplo.py com as credenciais e o
-# código informados via formulário: monta o SINMClient a partir do ambiente e
-# consulta o racional do cálculo da classificação.
+# Executa `exemplos/exemplo_v1.py --chave` com as credenciais e o código
+# informados via formulário: consulta a classificação e o racional do cálculo.
 # Respeita SINM_GRANT_TYPE (client_credentials padrão, ou password/ROPC).
 # Usuário/senha só são necessários para grant_type=password.
 # Senha e client_secret são mascarados nos logs.
 #
-# Disparo: Actions → "Racional do Cálculo (Exemplo 06)" → Run workflow
+# Disparo: Actions → "Racional do Cálculo" → Run workflow
 
 on:
   workflow_dispatch:
@@ -52,11 +51,6 @@ on:
         description: 'Proxy HTTP(S) opcional (ex: http://proxy.cnptia.embrapa.br:3128)'
         required: false
         type: string
-      formato_json:
-        description: 'Imprimir JSON cru em vez do relatório'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   racional:
@@ -80,7 +74,7 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Consultar racional
-        working-directory: exemplos/06_racional_por_codigo
+        working-directory: exemplos
         env:
           SINM_AMBIENTE: ${{ inputs.sinm_ambiente }}
           SINM_CLIENT_ID: ${{ inputs.sinm_client_id }}
@@ -89,9 +83,4 @@ jobs:
           SINM_USERNAME: ${{ inputs.sinm_username }}
           SINM_PASSWORD: ${{ inputs.sinm_password }}
           SINM_PROXY: ${{ inputs.sinm_proxy }}
-        run: |
-          if [ "${{ inputs.formato_json }}" = "true" ]; then
-            python exemplo.py --codigo "${{ inputs.codigo }}" --json
-          else
-            python exemplo.py --codigo "${{ inputs.codigo }}"
-          fi
+        run: python exemplo_v1.py --chave "${{ inputs.codigo }}"
