@@ -1,2 +1,10 @@
 status,path,codigo,acao
 500,,,Contate o suporte do SiNM sobre esse erro.
+401,,,"Token recusado pela API: obtenha um novo token. Se a mensagem indicar usuário ou service account não cadastrado, solicite o cadastro à equipe SiNM."
+408,,RN90,Tempo esgotado na API. Reenvie a requisição mais tarde; se persistir contate o suporte do SiNM.
+409,,RN409,"Nada foi gravado. Reenvie a mesma requisição após o tempo indicado em Retry-After, evitando requisições paralelas para a mesma chave."
+400,,RN03,As coberturas do solo devem ser dos últimos três anos. Remova ou atualize as avaliações mais antigas.
+400,,RN04,O plantio previsto já ocorreu: informe a cobertura do solo do ano do plantio.
+400,,RN15,A coleta está fora da validade em relação à previsão de plantio (química: 24 meses; física: 120 meses). Envie uma análise mais recente.
+400,,RN18,A gleba já tem análise deste tipo e a enviada não é mais recente (coleta anterior ao plantio). Envie uma análise com coleta mais recente.
+400,,RN20,"Existe análise mais recente do mesmo produtor para este polígono, anterior ao plantio. Associe a análise mais recente."

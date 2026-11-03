@@ -16,6 +16,8 @@ from .models import (
     CulturaAlvo,
     CULTURA_SOJA,
     CULTURA_MILHO,
+    TIPO_AMOSTRAGEM_GRADE_REGULAR,
+    TIPO_AMOSTRAGEM_ZONA_HOMOGENEA,
     DadoGleba,
     Ponto,
     AmostraQuimica,
@@ -37,6 +39,10 @@ from .exceptions import (
     NotFoundError,
     ValidationError,
     PermissaoError,
+    ConflitoConcorrenciaError,
+    TempoEsgotadoError,
+    NaoAutorizadoError,
+    UsuarioNaoCadastradoError,
 )
 
 __all__ = [
@@ -53,6 +59,8 @@ __all__ = [
     "CulturaAlvo",
     "CULTURA_SOJA",
     "CULTURA_MILHO",
+    "TIPO_AMOSTRAGEM_GRADE_REGULAR",
+    "TIPO_AMOSTRAGEM_ZONA_HOMOGENEA",
     "DadoGleba",
     "Ponto",
     "AmostraQuimica",
@@ -72,4 +80,8 @@ __all__ = [
     "NotFoundError",
     "ValidationError",
     "PermissaoError",
+    "ConflitoConcorrenciaError",
+    "TempoEsgotadoError",
+    "NaoAutorizadoError",
+    "UsuarioNaoCadastradoError",
 ]

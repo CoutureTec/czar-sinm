@@ -25,6 +25,8 @@ from czarsinm import (
     SensoriamentoRemoto,
     Talhao,
     TipoOperacao,
+    TIPO_AMOSTRAGEM_GRADE_REGULAR,
+    TIPO_AMOSTRAGEM_ZONA_HOMOGENEA,
 )
 from czarsinm.models import _remove_none
 
@@ -536,3 +538,101 @@ class TestDadoGlebaContratos:
         dado_gleba.culturaAlvo = CulturaAlvo.soja("2026-10-01", "2027-01-10")
         with pytest.raises(ValueError, match="só o histórico"):
             dado_gleba.to_dict(contrato)
+
+
+# ---------------------------------------------------------------------------
+# Paridade com o contrato da API: tipoAmostragem, idExterno, cultura, opcionais
+# ---------------------------------------------------------------------------
+
+class TestTipoAmostragem:
+    @pytest.mark.parametrize("contrato", ["v1", "v2"])
+    def test_quimica_emite_quando_informado(self, amostra, contrato):
+        a = AnaliseSoloQuimica(amostrasQuimicas=[amostra], cnpjLaboratorio="54194116000138",
+                               tipoAmostragem=TIPO_AMOSTRAGEM_ZONA_HOMOGENEA)
+        assert a.to_dict(contrato)["tipoAmostragem"] == "ZONA_HOMOGENEA"
+
+    def test_omitido_quando_ausente(self, analise_solo):
+        assert "tipoAmostragem" not in analise_solo.to_dict()
+
+    def test_fisica_e_combinada(self, amostra, amostra_fisica):
+        f = AnaliseSoloFisica(amostrasFisicas=[amostra_fisica], tipoAmostragem=TIPO_AMOSTRAGEM_GRADE_REGULAR)
+        assert f.to_dict()["tipoAmostragem"] == "GRADE_REGULAR"
+        c = AnaliseSolo(amostrasQuimicas=[amostra], amostrasFisicas=[amostra_fisica],
+                        tipoAmostragem=TIPO_AMOSTRAGEM_ZONA_HOMOGENEA)
+        assert c.to_dict()["tipoAmostragem"] == "ZONA_HOMOGENEA"
+
+    def test_separar_propaga(self, amostra, amostra_fisica):
+        c = AnaliseSolo(amostrasQuimicas=[amostra], amostrasFisicas=[amostra_fisica],
+                        tipoAmostragem=TIPO_AMOSTRAGEM_ZONA_HOMOGENEA)
+        q, f = c.separar()
+        assert q.tipoAmostragem == f.tipoAmostragem == "ZONA_HOMOGENEA"
+
+    def test_valor_invalido_falha(self, amostra):
+        a = AnaliseSoloQuimica(amostrasQuimicas=[amostra], tipoAmostragem="GRADE")
+        with pytest.raises(ValueError, match="GRADE_REGULAR"):
+            a.to_dict()
+
+
+class TestTalhaoIdExterno:
+    def test_emitido_quando_informado(self):
+        t = Talhao(poligono="POLYGON EMPTY", area=10.0, tipoProdutor="Proprietário", idExterno="TALHAO-7")
+        assert t.to_dict()["idExterno"] == "TALHAO-7"
+        assert "plantioContorno" not in t.to_dict()
+
+    def test_vazio_e_emitido_para_remover(self):
+        t = Talhao(poligono="POLYGON EMPTY", area=10.0, tipoProdutor="Proprietário", plantioContorno=0, idExterno="")
+        assert t.to_dict()["idExterno"] == ""
+
+    def test_acima_de_100_caracteres_falha(self):
+        with pytest.raises(ValueError, match="100"):
+            Talhao(poligono="POLYGON EMPTY", area=10.0, tipoProdutor="Proprietário", idExterno="x" * 101)
+
+
+class TestInterpretacaoCultura:
+    def test_cultura_opcional(self):
+        i = InterpretacaoCultura(tipoCultivo="Cultivo de 1ª safra", dataInicio="2025-10-01", dataFim="2026-02-01")
+        assert "cultura" not in i.to_dict()
+
+    def test_cultura_emitida(self):
+        i = InterpretacaoCultura(tipoCultivo="Cultivo de 1ª safra", dataInicio="2025-10-01",
+                                 dataFim="2026-02-01", cultura="Soja")
+        assert i.to_dict()["cultura"] == "Soja"
+
+
+class TestCamposOpcionaisNaApi:
+    def test_propriedade_so_com_car(self):
+        p = Propriedade(codigoCar="MT-5107248-1025F299474640148FE845C7A0B62635")
+        assert p.to_dict() == {"codigoCar": "MT-5107248-1025F299474640148FE845C7A0B62635"}
+
+    def test_propriedade_posicional_continua_valida(self):
+        p = Propriedade("Fazenda", "MT-5107248-1025F299474640148FE845C7A0B62635", "3509502", "POLYGON EMPTY")
+        assert p.to_dict()["nome"] == "Fazenda"
+
+    def test_propriedade_sem_car_falha(self):
+        with pytest.raises(TypeError, match="codigoCar"):
+            Propriedade(nome="Fazenda")
+
+    def test_manejo_sem_tipo_operacao(self):
+        m = Manejo(data="2025-09-01", operacao=Operacao(nomeOperacao="Revolvimento do solo"))
+        assert "tipoOperacao" not in m.to_dict()
+
+    def test_amostra_quimica_sem_responsavel(self, amostra):
+        amostra.cpfResponsavelColeta = None
+        assert "cpfResponsavelColeta" not in amostra.to_dict()
+
+    def test_amostra_quimica_sem_obrigatorio_falha(self):
+        with pytest.raises(TypeError, match="calcio"):
+            AmostraQuimica(dataColeta="2025-09-17", longitude=-47.0, latitude=-22.0, camada="00_020",
+                           magnesio=1, potassio=1, aluminio=1, acidezPotencial=1, enxofre=1, mos=1)
+
+    def test_sensoriamento_sem_opcionais(self, sensoriamento_remoto):
+        sensoriamento_remoto.declividadeMedia = None
+        sensoriamento_remoto.plantioContorno = None
+        sensoriamento_remoto.terraceamento = None
+        d = sensoriamento_remoto.to_dict()
+        assert not {"declividadeMedia", "plantioContorno", "terraceamento"} & d.keys()
+
+    def test_sensoriamento_sem_indices_falha(self):
+        with pytest.raises(TypeError, match="indices"):
+            SensoriamentoRemoto(dataInicial="2025-01-01", dataFinal="2025-12-31",
+                                codigoSateliteDeclividadeMedia="S09")

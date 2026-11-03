@@ -7,6 +7,35 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+### Adicionado
+- `tipoAmostragem` em `AnaliseSolo`, `AnaliseSoloQuimica` e `AnaliseSoloFisica`
+  (`TIPO_AMOSTRAGEM_GRADE_REGULAR` — 1 amostra a cada 25 ha, assumido pela API quando
+  omitido — ou `TIPO_AMOSTRAGEM_ZONA_HOMOGENEA` — 1 a cada 1000 ha). `separar()` propaga o
+  campo. ([#38](https://github.com/CoutureTec/czar-sinm/issues/38))
+- `Talhao.idExterno` (até 100 caracteres) e filtro `id_externo` em `listar_glebas` e
+  `listar_classificacoes`. ([#39](https://github.com/CoutureTec/czar-sinm/issues/39))
+- `InterpretacaoCultura.cultura`: nome da cultura identificada, opcional.
+  ([#40](https://github.com/CoutureTec/czar-sinm/issues/40))
+- `listar_culturas()` e `listar_satelites()`: tabelas de domínio de `Cultura.codigo` e dos
+  `codigoSatelite*`, sempre em `/api/v1`. ([#41](https://github.com/CoutureTec/czar-sinm/issues/41))
+- Exceções específicas, todas subclasses de `APIError`
+  ([#42](https://github.com/CoutureTec/czar-sinm/issues/42)):
+  - `ConflitoConcorrenciaError` (409): nada foi gravado; reenviar após `retry_after` segundos.
+  - `TempoEsgotadoError` (408).
+  - `NaoAutorizadoError` (401): token recusado pela API, com `erro` e `descricao` lidos de
+    `WWW-Authenticate`; `UsuarioNaoCadastradoError` quando o usuário ou service account não
+    está cadastrado no SiNM.
+- Ações sugeridas para 401, 408, 409 e para as regras RN03, RN04, RN15, RN18 e RN20.
+
+### Alterado
+- Campos opcionais na API deixam de ser obrigatórios no SDK
+  ([#43](https://github.com/CoutureTec/czar-sinm/issues/43)): `Propriedade.nome`,
+  `.codigoIbge` e `.poligono`; `Talhao.plantioContorno`; `Manejo.tipoOperacao`;
+  `AmostraQuimica.cpfResponsavelColeta`; `SensoriamentoRemoto.declividadeMedia`,
+  `.plantioContorno` e `.terraceamento`. A ordem dos campos não mudou: construção por
+  posição continua válida, e os obrigatórios que vêm depois de um opcional são conferidos na
+  construção (`TypeError` com o que falta).
+
 ## [0.3.0] — 2026-11-03
 
 ### Adicionado
