@@ -1,0 +1,100 @@
+[
+  {
+    "idExterno": "TALHAO-001",
+    "produtor": {
+      "nome": "Produtor Exemplo",
+      "cpf": "68122528082"
+    },
+    "propriedade": {
+      "nome": "Fazenda Exemplo",
+      "cnpj": "54194116000138",
+      "codigoCar": "MT-5107248-1025F299474640148FE845C7A0B62635",
+      "codigoIbge": "3509502",
+      "poligono": "POLYGON ((-47.115 -22.815, -47.098 -22.815, -47.098 -22.807, -47.115 -22.807, -47.115 -22.815))"
+    },
+    "talhao": {
+      "poligono": "POLYGON ((-47.112207 -22.809752, -47.104869 -22.809969, -47.102916 -22.809000, -47.101350 -22.809633, -47.100041 -22.811749, -47.106500 -22.813253, -47.112358 -22.809910, -47.112207 -22.809752))",
+      "area": 32.0,
+      "tipoProdutor": "Proprietário",
+      "plantioContorno": 1,
+      "cnpjOperador": null
+    },
+    "culturaAlvo": {
+      "cultura": "soja",
+      "dataPrevisaoPlantio": "2026-10-01",
+      "dataPrevisaoColheita": "2027-01-10"
+    },
+    "manejos": [
+      {"data": "2022-09-01", "operacao": "Revolvimento do solo", "tipoOperacao": "ARAÇÃO"}
+    ],
+    "coberturas": [
+      {"dataAvaliacao": "2023-01-01", "porcentualPalhada": 50},
+      {"dataAvaliacao": "2024-01-01", "porcentualPalhada": 55},
+      {"dataAvaliacao": "2025-01-01", "porcentualPalhada": 60}
+    ],
+    "producoes": [
+      {"codigoCultura": "001", "ilp": false, "dataPlantio": "2022-10-01", "dataColheita": "2023-01-10"},
+      {"codigoCultura": "018", "ilp": false, "dataPlantio": "2023-02-21", "dataColheita": "2023-06-15"},
+      {"codigoCultura": "001", "ilp": false, "dataPlantio": "2024-10-01", "dataColheita": "2025-01-10"}
+    ],
+    "analiseSolo": {
+      "cnpjLaboratorio": null,
+      "tipoAmostragem": "GRADE_REGULAR",
+      "amostrasQuimicas": [
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.108493, "latitude": -22.811532, "camada": "00_020",
+         "calcio": 0.9, "magnesio": 0.8, "potassio": 59.9, "sodio": 5.6, "aluminio": 0.36, "acidezPotencial": 5.0,
+         "phh2o": 5.4, "fosforoMehlich": 1.1, "enxofre": 6.4, "mos": 10.8},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.106733, "latitude": -22.812530, "camada": "00_020",
+         "calcio": 0.8, "magnesio": 0.7, "potassio": 59.2, "sodio": 5.9, "aluminio": 0.36, "acidezPotencial": 4.4,
+         "phh2o": 5.5, "fosforoMehlich": 1.2, "enxofre": 7.3, "mos": 12.6},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.103408, "latitude": -22.812253, "camada": "20_040",
+         "calcio": 0.5, "magnesio": 1.1, "potassio": 42.9, "sodio": 7.9, "aluminio": 1.215, "acidezPotencial": 5.2,
+         "phh2o": 5.2, "fosforoMehlich": 0.8, "enxofre": 6.4, "mos": 7.2},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.103418, "latitude": -22.812263, "camada": "20_040",
+         "calcio": 0.5, "magnesio": 1.2, "potassio": 42.9, "sodio": 7.9, "aluminio": 1.215, "acidezPotencial": 5.2,
+         "phh2o": 5.2, "fosforoMehlich": 0.8, "enxofre": 6.4, "mos": 7.2}
+      ],
+      "amostrasFisicas": [
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.108493, "latitude": -22.811532, "camada": "00_020",
+         "areia": 78.0, "silte": 5.0, "argila": 17.0},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.106733, "latitude": -22.812530, "camada": "00_020",
+         "areia": 75.0, "silte": 6.0, "argila": 19.0},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.103408, "latitude": -22.812253, "camada": "20_040",
+         "areia": 71.0, "silte": 7.0, "argila": 22.0},
+        {"cpfResponsavelColeta": "21750077078", "dataColeta": "2026-09-15", "longitude": -47.103418, "latitude": -22.811531, "camada": "20_040",
+         "areia": 71.0, "silte": 8.0, "argila": 22.0}
+      ]
+    },
+    "sensoriamentoRemoto": {
+      "dataInicial": "2021-01-17",
+      "dataFinal": "2024-05-14",
+      "declividadeMedia": 60,
+      "plantioContorno": 1,
+      "terraceamento": 1,
+      "codigoSateliteDeclividadeMedia": "S09",
+      "codigoSatelitePlantioContorno": "S08",
+      "codigoSateliteTerraceamento": "S07",
+      "indices": [
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2021-01-17", "ndvi": 0.5363, "ndti": 0.3363},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2021-04-07", "ndvi": 0.8810, "ndti": 0.6810},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2022-04-07", "ndvi": 0.9119, "ndti": 0.7119},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2022-09-01", "ndvi": 0.3342, "ndti": 0.1342},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2023-03-30", "ndvi": 0.9151, "ndti": 0.7151},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2023-09-22", "ndvi": 0.3370, "ndti": 0.1370},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2024-03-29", "ndvi": 0.9355, "ndti": 0.7355},
+        {"codigoSatelite": "S01", "longitude": -47.108493, "latitude": -22.811532, "data": "2024-05-08", "ndvi": 0.9153, "ndti": 0.7153}
+      ],
+      "interpretacoesCoberturaSolo": [
+        {"dataAvaliacao": "2022-01-01", "porcentualPalhada": 50},
+        {"dataAvaliacao": "2023-01-01", "porcentualPalhada": 55},
+        {"dataAvaliacao": "2024-01-01", "porcentualPalhada": 60}
+      ],
+      "interpretacoesCultura": [
+        {"tipoCultivo": "Cultivo de 2ª safra", "dataInicio": "2023-10-01", "dataFim": "2024-02-01"}
+      ],
+      "interpretacoesManejo": [
+        {"data": "2021-01-28", "operacao": "Revolvimento do solo"}
+      ]
+    }
+  }
+]

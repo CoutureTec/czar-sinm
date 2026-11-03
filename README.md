@@ -7,7 +7,7 @@ Biblioteca Python para integração com a **SiNM** (Sistema de Informações de 
 
 Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema SiNM.
 
-Há exemplos de uso com fonte de dados interna e arquivos. → [Veja os exemplos de uso](exemplos/README.md)
+Há exemplos do fluxo completo, com dados em JSON ou CSV. → [Veja os exemplos de uso](exemplos/README.md)
 
 
 # Motivação de manter uma biblioteca pública 
@@ -18,7 +18,6 @@ O `czarsinm` encapsula toda essa complexidade em uma interface de alto nível: *
 
 Por ser **open-source**, a biblioteca se beneficia de múltiplos olhares: bugs são identificados mais cedo, edge cases reportados por outros integradores viram correções que todos aproveitam, e o código passa por revisão pública contínua — o que resulta em uma base mais confiável do que qualquer implementação proprietária isolada.
 
-Há exemplos de uso com dados embutidos no código e com dados em arquivos CSV.
 → [Veja os exemplos](exemplos/README.md)
 
 ## Pré-requisitos
@@ -42,64 +41,19 @@ pip install git+https://github.com/CoutureTec/czar-sinm.git@v0.1.0
 
 ## Início rápido
 
-### Exploração interativa (sem configuração prévia)
+### Exemplos prontos
 
-A forma mais rápida de testar a biblioteca é usando a interface interativa,
-que **não exige configuração prévia**: se não houver um arquivo `.env`, ela
-solicita as credenciais diretamente no terminal e oferece salvar para as
-próximas execuções.
+O diretório [`exemplos/`](exemplos/README.md) tem o fluxo completo — autenticação,
+gleba, análise de solo química e física, sensoriamento remoto, classificação (ONM)
+e racional do cálculo — em um script para o `/api/v1` e outro para o `/api/v2`.
+Os dados vêm de uma fonte configurável (JSON ou CSV), fácil de trocar por um
+banco de dados ou outro sistema.
 
 ```bash
-cd exemplos/04_interativo
-python exemplo.py
+cd exemplos
+cp env.example .env        # preencha as credenciais
+python exemplo_v2.py       # ou exemplo_v1.py
 ```
-
-Na primeira execução sem `.env`, você verá:
-
-```
-================================================================
-  SINM — Credenciais
-================================================================
-  Arquivo .env não encontrado.
-  Preencha as credenciais abaixo (senha não será exibida):
-
-  Usuário       (SINM_USERNAME)    :
-  Senha         (SINM_PASSWORD)    :
-  Client ID     (SINM_CLIENT_ID)   :
-  Client Secret (SINM_CLIENT_SECRET):
-  Ambiente      [hml/prd, Enter=hml]:
-```
-
-Após autenticar, um menu completo é exibido com todas as operações
-disponíveis — listar, cadastrar, buscar e consultar recursos — organizado
-por domínio:
-
-```
-================================================================
-  SINM — Interface Interativa  |  HML
-  Usuário : joao.silva@empresa.com.br
-================================================================
-
-  GLEBAS
-  [ 1] Listar Glebas
-  [ 2] Cadastrar Gleba
-  [ 3] Buscar Gleba por UUID
-
-  ANÁLISE DE SOLO
-  [ 4] Listar Análises de Solo
-  ...
-
-  CONTA
-  [12] Definir CNPJ Operador Ativo
-  [13] Ver Autorizações Completas
-
-  [ 0] Sair
-================================================================
-  Opção:
-```
-
-Consulte o [README do exemplo interativo](exemplos/04_interativo/README.md)
-para detalhes sobre todas as opções do menu.
 
 ### Uso via código
 
