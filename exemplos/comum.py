@@ -101,14 +101,14 @@ def ajustar_datas_do_exemplo(registro: dict) -> dict:
     valida datas contra o dia de hoje (coberturas recentes, coleta próxima do
     plantio). Para que eles continuem válidos, todas as datas avançam o mesmo
     número de anos até o plantio cair no próximo 1º de outubro, e a coleta das
-    amostras passa a ser de dois dias atrás. Não use com dados reais.
+    amostras passa a ser de ontem. Não use com dados reais.
     """
     hoje = date.today()
     plantio = date(hoje.year, 10, 1)
     if plantio <= hoje:
         plantio = date(hoje.year + 1, 10, 1)
     anos = plantio.year - 2026
-    coleta = (hoje - timedelta(days=2)).isoformat()
+    coleta = (hoje - timedelta(days=1)).isoformat()
 
     def ajustar(valor, chave=None):
         if isinstance(valor, dict):
@@ -139,10 +139,10 @@ def etapa(titulo: str):
         print(f"    ok ({time.perf_counter() - inicio:.2f}s)")
     except APIError as exc:
         falhas += 1
-        print(exc.format_report(), file=sys.stderr)
+        print(exc.format_report())
     except SINMError as exc:
         falhas += 1
-        print(f"    ERRO: {exc}", file=sys.stderr)
+        print(f"    ERRO: {exc}")
 
 
 def autenticar(client: SINMClient) -> None:
@@ -188,6 +188,6 @@ def imprimir_racional(r: dict) -> None:
 def encerrar() -> None:
     """Sai com código 1 se alguma etapa falhou (útil em CI)."""
     if falhas:
-        print(f"\n{falhas} etapa(s) com erro.", file=sys.stderr)
+        print(f"\n{falhas} etapa(s) com erro.")
         sys.exit(1)
     print("\nConcluído sem erros.")
