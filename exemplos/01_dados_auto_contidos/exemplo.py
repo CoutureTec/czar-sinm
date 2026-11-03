@@ -23,6 +23,7 @@ import logging
 import os
 import sys
 import time
+from datetime import date
 
 from dotenv import load_dotenv
 
@@ -144,10 +145,28 @@ client = SINMClient(
 # Payloads de exemplo (reutilizados pelas funções abaixo)
 # --------------------------------------------------------------------------
 
+# As datas abaixo foram escritas para um plantio em 01/10/2026. A API valida
+# datas contra o dia de hoje (cobertura dos últimos 3 anos, cobertura do ano
+# do plantio já ocorrido, coleta a no máximo 24 meses do plantio), então todas
+# avançam o mesmo número de anos para o plantio cair no próximo 1º de outubro.
+def _proximo_plantio() -> date:
+    hoje = date.today()
+    plantio = date(hoje.year, 10, 1)
+    return plantio if plantio > hoje else date(hoje.year + 1, 10, 1)
+
+
+_DESLOCAMENTO_ANOS = _proximo_plantio().year - 2026
+
+
+def _d(iso: str) -> str:
+    """Desloca uma data ISO de exemplo pelo número de anos em _DESLOCAMENTO_ANOS."""
+    return f"{int(iso[:4]) + _DESLOCAMENTO_ANOS}{iso[4:]}"
+
+
 # Previsão de plantio e colheita da safra a classificar, por cultura-alvo.
 _PREVISOES = {
-    "soja":  ("2026-10-01", "2027-01-10"),
-    "milho": ("2026-10-01", "2027-02-20"),
+    "soja":  (_d("2026-10-01"), _d("2027-01-10")),
+    "milho": (_d("2026-10-01"), _d("2027-02-20")),
 }
 
 
@@ -196,24 +215,24 @@ def _dado_gleba() -> DadoGleba:
         ),
         manejos=[
             Manejo(
-                data="2022-09-01",
+                data=_d("2022-09-01"),
                 operacao=Operacao(nomeOperacao="Revolvimento do solo"),
                 tipoOperacao=TipoOperacao(tipo="ARAÇÃO"),
             ),
         ],
         coberturas=[
-            CoberturaSolo(dataAvaliacao="2023-01-01", porcentualPalhada=50),
-            CoberturaSolo(dataAvaliacao="2024-01-01", porcentualPalhada=55),
-            CoberturaSolo(dataAvaliacao="2025-01-01", porcentualPalhada=60),
+            CoberturaSolo(dataAvaliacao=_d("2023-01-01"), porcentualPalhada=50),
+            CoberturaSolo(dataAvaliacao=_d("2024-01-01"), porcentualPalhada=55),
+            CoberturaSolo(dataAvaliacao=_d("2025-01-01"), porcentualPalhada=60),
         ],
         # Histórico de cultivos (usado nos critérios de sucessão)
         producoes=[
             Producao(cultura=Cultura(codigo="001"), ilp=False,   # Soja (grão)
-                     dataPlantio="2022-10-01", dataColheita="2023-01-10"),
+                     dataPlantio=_d("2022-10-01"), dataColheita=_d("2023-01-10")),
             Producao(cultura=Cultura(codigo="018"), ilp=False,   # Aveia preta (silagem/feno)
-                     dataPlantio="2023-02-21", dataColheita="2023-08-01"),
+                     dataPlantio=_d("2023-02-21"), dataColheita=_d("2023-08-01")),
             Producao(cultura=Cultura(codigo="001"), ilp=False,   # Soja (grão)
-                     dataPlantio="2024-10-01", dataColheita="2025-01-10"),
+                     dataPlantio=_d("2024-10-01"), dataColheita=_d("2025-01-10")),
         ],
         # Safra a classificar. No v1 o SDK a envia como a produção com previsão
         # de plantio e colheita; no v2, no campo culturaAlvo.
@@ -228,28 +247,28 @@ def _analise_solo() -> AnaliseSolo:
         cnpjLaboratorio=CNPJ_LABORATORIO,
         amostrasQuimicas=[
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.108493, latitude=-22.811532, camada="00_020",
                 calcio=0.9, magnesio=0.8, potassio=59.9, sodio=5.6,
                 aluminio=0.36, acidezPotencial=5.0,
                 phh2o=5.4, fosforoMehlich=1.1, enxofre=6.4, mos=10.8,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.106733, latitude=-22.812530, camada="00_020",
                 calcio=0.8, magnesio=0.7, potassio=59.2, sodio=5.9,
                 aluminio=0.36, acidezPotencial=4.4,
                 phh2o=5.5, fosforoMehlich=1.2, enxofre=7.3, mos=12.6,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.103408, latitude=-22.812253, camada="20_040",
                 calcio=0.5, magnesio=1.1, potassio=42.9, sodio=7.9,
                 aluminio=1.215, acidezPotencial=5.2,
                 phh2o=5.2, fosforoMehlich=0.8, enxofre=6.4, mos=7.2,
             ),
             Amostra(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-18",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-18"),
                 longitude=-47.103418, latitude=-22.812263, camada="20_040",
                 calcio=0.5, magnesio=1.2, potassio=42.9, sodio=7.9,
                 aluminio=1.215, acidezPotencial=5.2,
@@ -258,22 +277,22 @@ def _analise_solo() -> AnaliseSolo:
         ],
         amostrasFisicas=[
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.108493, latitude=-22.811532, camada="00_020",
                 areia=78.0, silte=5.0, argila=17.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.106733, latitude=-22.812530, camada="00_020",
                 areia=75.0, silte=6.0, argila=19.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.103408, latitude=-22.812253, camada="20_040",
                 areia=71.0, silte=7.0, argila=22.0,
             ),
             AmostraFisica(
-                cpfResponsavelColeta="21750077078", dataColeta="2024-09-17",
+                cpfResponsavelColeta="21750077078", dataColeta=_d("2024-09-17"),
                 longitude=-47.103418, latitude=-22.811531, camada="20_040",
                 areia=71.0, silte=8.0, argila=22.0,
             ),
@@ -284,27 +303,27 @@ def _analise_solo() -> AnaliseSolo:
 def _sensoriamento_remoto() -> SensoriamentoRemoto:
     indices = [
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2021-01-17", ndvi=0.5363, ndti=0.3363),
+               data=_d("2021-01-17"), ndvi=0.5363, ndti=0.3363),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2021-04-07", ndvi=0.8810, ndti=0.6810),
+               data=_d("2021-04-07"), ndvi=0.8810, ndti=0.6810),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2022-04-07", ndvi=0.9119, ndti=0.7119),
+               data=_d("2022-04-07"), ndvi=0.9119, ndti=0.7119),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2022-09-01", ndvi=0.3342, ndti=0.1342),
+               data=_d("2022-09-01"), ndvi=0.3342, ndti=0.1342),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2023-03-30", ndvi=0.9151, ndti=0.7151),
+               data=_d("2023-03-30"), ndvi=0.9151, ndti=0.7151),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2023-09-22", ndvi=0.3370, ndti=0.1370),
+               data=_d("2023-09-22"), ndvi=0.3370, ndti=0.1370),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2024-03-29", ndvi=0.9355, ndti=0.7355),
+               data=_d("2024-03-29"), ndvi=0.9355, ndti=0.7355),
         Indice(codigoSatelite="S01", longitude=-47.108493, latitude=-22.811532,
-               data="2024-05-08", ndvi=0.9153, ndti=0.7153),
+               data=_d("2024-05-08"), ndvi=0.9153, ndti=0.7153),
     ]
     return SensoriamentoRemoto(
         cpfProdutor="68122528082",
         cnpjPropriedade="54194116000138",
-        dataInicial="2021-01-17",
-        dataFinal="2024-05-14",
+        dataInicial=_d("2021-01-17"),
+        dataFinal=_d("2024-05-14"),
         declividadeMedia=60,
         plantioContorno=1,
         terraceamento=1,
@@ -313,16 +332,16 @@ def _sensoriamento_remoto() -> SensoriamentoRemoto:
         codigoSateliteTerraceamento="S07",
         indices=indices,
         interpretacoesCoberturaSolo=[
-            InterpretacaoCoberturaSolo(dataAvaliacao="2022-01-01", porcentualPalhada=50),
-            InterpretacaoCoberturaSolo(dataAvaliacao="2023-01-01", porcentualPalhada=55),
-            InterpretacaoCoberturaSolo(dataAvaliacao="2024-01-01", porcentualPalhada=60),
+            InterpretacaoCoberturaSolo(dataAvaliacao=_d("2022-01-01"), porcentualPalhada=50),
+            InterpretacaoCoberturaSolo(dataAvaliacao=_d("2023-01-01"), porcentualPalhada=55),
+            InterpretacaoCoberturaSolo(dataAvaliacao=_d("2024-01-01"), porcentualPalhada=60),
         ],
         interpretacoesCultura=[
             InterpretacaoCultura(tipoCultivo="Cultivo de 2ª safra",
-                                 dataInicio="2023-10-01", dataFim="2024-02-01"),
+                                 dataInicio=_d("2023-10-01"), dataFim=_d("2024-02-01")),
         ],
         interpretacoesManejo=[
-            InterpretacaoManejo(data="2021-01-28", operacao="Revolvimento do solo"),
+            InterpretacaoManejo(data=_d("2021-01-28"), operacao="Revolvimento do solo"),
         ],
     )
 
