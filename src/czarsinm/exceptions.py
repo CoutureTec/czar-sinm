@@ -3,6 +3,7 @@
 from __future__ import annotations
 import csv
 import os
+import re
 from typing import Optional
 
 _ACOES_CSV = os.path.join(os.path.dirname(__file__), "acoes_sugeridas.csv")
@@ -155,6 +156,57 @@ class NotFoundError(APIError):
 
 class ValidationError(APIError):
     """Erro de validação dos dados enviados (HTTP 400/422)."""
+
+
+class ConflitoConcorrenciaError(APIError):
+    """A requisição concorreu com outra sobre os mesmos dados e foi desfeita (HTTP 409, RN409).
+
+    Nada foi gravado: reenvie a mesma requisição depois de ``retry_after`` segundos,
+    de preferência sem requisições paralelas para a mesma chave.
+    """
+
+    def __init__(self, status_code: int, message: str, body: Optional[dict] = None,
+                 retry_after: Optional[float] = None):
+        super().__init__(status_code, message, body)
+        self.retry_after = retry_after
+        """Segundos sugeridos pela API (cabeçalho ``Retry-After``); ``None`` se ausente."""
+
+
+class TempoEsgotadoError(APIError):
+    """A API esgotou o tempo ao processar a requisição (HTTP 408, RN90). Reenvie mais tarde."""
+
+
+class NaoAutorizadoError(APIError):
+    """A API recusou o token (HTTP 401).
+
+    Diferente de :class:`AuthenticationError`, que é a falha ao obter o token no
+    Keycloak: aqui o token foi emitido, mas a API não o aceitou (expirado, inválido
+    ou de usuário/service account não cadastrado no SiNM). A API não manda corpo;
+    o motivo vem no cabeçalho ``WWW-Authenticate``.
+    """
+
+    def __init__(self, status_code: int, message: str, body: Optional[dict] = None,
+                 erro: Optional[str] = None, descricao: Optional[str] = None):
+        super().__init__(status_code, message, body)
+        self.erro = erro
+        """Código OAuth2 do erro (ex.: ``invalid_token``)."""
+        self.descricao = descricao
+        """Descrição do motivo (``error_description``)."""
+
+
+class UsuarioNaoCadastradoError(NaoAutorizadoError):
+    """O token é válido, mas o usuário ou service account não está cadastrado no SiNM (HTTP 401).
+
+    O cadastro é feito pela equipe SiNM; obter um novo token não resolve.
+    """
+
+
+_PARAMETRO_WWW_AUTHENTICATE = re.compile(r'(\w+)="((?:[^"\\]|\\.)*)"')
+
+
+def _ler_www_authenticate(cabecalho: str) -> dict:
+    """Extrai os parâmetros ``chave="valor"`` de um cabeçalho ``WWW-Authenticate``."""
+    return {k: v.replace('\\"', '"') for k, v in _PARAMETRO_WWW_AUTHENTICATE.findall(cabecalho or "")}
 
 
 _CLIENTS_INTERNOS_KEYCLOAK = {"account", "realm-management", "broker"}

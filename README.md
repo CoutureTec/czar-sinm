@@ -118,7 +118,7 @@ client = SINMClient(
 )
 
 # Verifica autenticação
-print("Roles:", client.roles)
+print("Client roles:", client.client_roles)
 
 # Lista glebas cadastradas
 try:
@@ -132,7 +132,7 @@ except APIError as e:
 
 #### Fluxo de autenticação
 
-Desde a versão 0.3.x, o **default** é OAuth2 **Client Credentials** —
+O **default** é OAuth2 **Client Credentials** —
 o backend zarc-nm autoriza por empresa (client) usando service-account roles,
 e esse modelo só funciona com Client Credentials.
 
@@ -167,7 +167,7 @@ src/czarsinm/
 ├── client.py       # SINMClient — métodos principais + diagnóstico de 403
 ├── auth.py         # Autenticação Keycloak com cache e renovação de token
 ├── models.py       # Dataclasses para os payloads da API
-└── exceptions.py   # SINMError, ValidationError, NotFoundError, PermissaoError, ...
+└── exceptions.py   # SINMError, ValidationError, PermissaoError, ConflitoConcorrenciaError, ...
 ```
 
 ## Referência rápida da API
@@ -181,13 +181,16 @@ client = SINMClient(
     ambiente="hml",
 )
 
-# Roles do usuário autenticado (extraídos do token JWT)
-client.roles                                     # list[str]
+# Roles do token JWT
+client.roles                                     # list[str] — realm roles
+client.client_roles                              # dict[str, list[str]] — client roles por client (CNPJ)
 
-# Talhão / Gleba
-client.cadastrar_gleba(dado_gleba)               # POST /api/v1/glebas
-client.buscar_gleba(uuid)                        # GET  /api/v1/glebas/{uuid}
-client.listar_glebas()                           # GET  /api/v1/glebas
+# Talhão / Gleba  (/api/v1 ou /api/v2, conforme api_version)
+client.cadastrar_gleba(dado_gleba)               # POST /api/{v}/glebas
+client.atualizar_gleba(uuid, dado_gleba)         # PUT  /api/{v}/glebas/{uuid}
+client.buscar_gleba(uuid)                        # GET  /api/{v}/glebas/{uuid}
+client.listar_glebas()                           # GET  /api/{v}/glebas
+client.listar_glebas(id_externo="TALHAO-7")      # filtra pelo Talhao.idExterno
 
 # Análise de Solo — química
 client.cadastrar_analise_solo_quimica(analise, chave_classificacao_nm=chave)
@@ -221,6 +224,11 @@ client.remover_sensoriamento_remoto(uuid)        # depreciado: só ADMINISTRADOR
 client.consultar_classificacao(chave)            # GET  /api/v1/classificacoes/{chave}
 client.consultar_racional(chave)                 # GET  .../{chave}/racional
 client.listar_classificacoes()                   # GET  /api/v1/classificacoes (mais recente primeiro)
+client.listar_classificacoes(id_externo="TALHAO-7")
+
+# Tabelas de domínio (sempre /api/v1; qualquer usuário autenticado)
+client.listar_culturas()                         # códigos de Cultura.codigo
+client.listar_satelites()                        # códigos dos codigoSatelite*
 ```
 
 Os `listar_*` percorrem todas as páginas da API e devolvem a lista completa.
@@ -244,17 +252,18 @@ O que muda no `v2`:
 | Análise de solo | química, física **e** o payload combinado | só química e física — `cadastrar_analise_solo` levanta `ValueError` |
 | `cnpjLaboratorio` | opcional | **obrigatório** — o SDK valida antes de enviar (a API responde 400) |
 | Nomes legados (`cnpj`, `betaGlicosidade`) | aceitos e enviados junto | não enviados; se chegarem, a API os descarta em silêncio |
-
 | Gleba | safra a classificar como uma produção de `producoes` com as duas previsões | `culturaAlvo` obrigatório; `producoes` leva só o histórico |
 
 O roteamento por versão vale para gleba, análise de solo e sensoriamento remoto.
-Classificação e `analises-solo/disponiveis` seguem em `/api/v1` nos dois modos —
-não existe `v2` desses recursos.
+Classificação, `analises-solo/disponiveis`, culturas e satélites seguem em `/api/v1`
+nos dois modos — não existe `v2` desses recursos.
 
 ### Cultura-alvo (soja ou milho)
 
 A safra que será classificada é declarada com `CulturaAlvo` — só soja (`001`)
-e milho (`002`) são cultura-alvo:
+e milho (`002`) são cultura-alvo. A safra é definida pela data de plantio (agosto a
+julho) e leva o nome do ano em que termina: um plantio em outubro de 2026 é da
+safra 2027 (2026/27).
 
 ```python
 from czarsinm import CulturaAlvo, DadoGleba
@@ -275,6 +284,25 @@ funcionando nos dois — essa produção é promovida a alvo. No `v2`, porém,
 produção é a safra futura serializa no `v1`, mas no `v2` levanta `ValueError`.
 Declarar `culturaAlvo` **e** uma produção com as duas previsões é erro.
 
+### Campos novos e opcionais
+
+```python
+from czarsinm import TIPO_AMOSTRAGEM_ZONA_HOMOGENEA
+
+Talhao(..., idExterno="TALHAO-7")                 # id do seu sistema, até 100 caracteres
+AnaliseSoloQuimica(..., tipoAmostragem=TIPO_AMOSTRAGEM_ZONA_HOMOGENEA)
+InterpretacaoCultura("Cultivo de 1ª safra", "2025-10-01", "2026-02-01", cultura="Soja")
+Propriedade(codigoCar="MT-5107248-1025F299474640148FE845C7A0B62635")  # só o CAR é obrigatório
+```
+
+- `idExterno` não precisa ser único e não deve conter dado pessoal (é gravado sem
+  criptografia). No `atualizar_gleba`, `None` mantém o valor gravado e `""` o remove.
+- `tipoAmostragem` define a densidade amostral exigida: `GRADE_REGULAR` (1 amostra a
+  cada 25 ha, assumido quando omitido) ou `ZONA_HOMOGENEA` (1 a cada 1000 ha).
+- São opcionais, como na API: `Propriedade.nome`/`codigoIbge`/`poligono`,
+  `Talhao.plantioContorno`, `Manejo.tipoOperacao`, `AmostraQuimica.cpfResponsavelColeta`
+  e `SensoriamentoRemoto.declividadeMedia`/`plantioContorno`/`terraceamento`.
+
 `betaGlicosidase` é a grafia canônica. A antiga `betaGlicosidade` (erro de
 grafia) ainda é aceita pelo dataclass, mas emite `DeprecationWarning`; informar
 as duas com valores diferentes é erro.
@@ -286,17 +314,27 @@ Os erros retornados pelas chamadas à api são logados de forma a tornar mais cl
 ```python
 from czarsinm.exceptions import (
     AuthenticationError,
+    UsuarioNaoCadastradoError,
+    NaoAutorizadoError,
     PermissaoError,
     ValidationError,
     NotFoundError,
+    ConflitoConcorrenciaError,
+    TempoEsgotadoError,
     APIError,
 )
 
 try:
     resposta = client.cadastrar_gleba(dado_gleba)
 except AuthenticationError as e:
-    # Falha no login ou credenciais inválidas
+    # Falha no login no Keycloak (credenciais inválidas)
     print(f"Falha na autenticação: {e}")
+except UsuarioNaoCadastradoError as e:
+    # HTTP 401 — token válido, mas usuário/service account não cadastrado no SiNM
+    print(e.format_report())
+except NaoAutorizadoError as e:
+    # HTTP 401 — token recusado pela API (expirado, inválido); motivo em e.descricao
+    print(e.format_report())
 except PermissaoError as e:
     # HTTP 403 — exibe os client roles do usuário (por CNPJ) vs. roles exigidos
     print(e.format_report())
@@ -306,10 +344,22 @@ except ValidationError as e:
 except NotFoundError as e:
     # HTTP 404
     print(f"Recurso não encontrado: {e}")
+except ConflitoConcorrenciaError as e:
+    # HTTP 409 — nada foi gravado; reenvie após e.retry_after segundos
+    time.sleep(e.retry_after or 1)
+    resposta = client.cadastrar_gleba(dado_gleba)
+except TempoEsgotadoError as e:
+    # HTTP 408 — reenvie mais tarde
+    print(e.format_report())
 except APIError as e:
     # Outros erros HTTP
     print(e.format_report())
 ```
+
+Todas as exceções da API herdam de `APIError`. O relatório (`format_report()`)
+inclui uma ação sugerida para os erros mais comuns — 401, 408, 409 e as regras de
+negócio de cobertura do solo (RN03, RN04) e de validade e escolha da análise de
+solo (RN15, RN18, RN20).
 
 ### Exemplo de relatório de erro 403
 

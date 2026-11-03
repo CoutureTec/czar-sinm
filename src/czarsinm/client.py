@@ -19,7 +19,17 @@ from typing import Optional
 import requests
 
 from .auth import KeycloakAuth
-from .exceptions import APIError, NotFoundError, PermissaoError, ValidationError
+from .exceptions import (
+    APIError,
+    ConflitoConcorrenciaError,
+    NaoAutorizadoError,
+    NotFoundError,
+    PermissaoError,
+    TempoEsgotadoError,
+    UsuarioNaoCadastradoError,
+    ValidationError,
+    _ler_www_authenticate,
+)
 from .models import (
     AnaliseSolo,
     AnaliseSoloFisica,
@@ -82,6 +92,28 @@ def _regra_do_endpoint(path: str, metodo: Optional[str] = None) -> tuple:
 def _roles_para_endpoint(path: str, metodo: Optional[str] = None) -> list:
     """Roles exigidos pelo endpoint (ver :func:`_regra_do_endpoint`)."""
     return _regra_do_endpoint(path, metodo)[0]
+
+
+def _filtro_id_externo(id_externo: Optional[str]) -> Optional[dict]:
+    return {"idExterno": id_externo} if id_externo is not None else None
+
+
+_DESCRICAO_NAO_CADASTRADO = re.compile(r"cadastrad\w* no sistema", re.IGNORECASE)
+
+
+def _corrigir_codificacao(texto: str) -> str:
+    """Desfaz UTF-8 lido como Latin-1, como o ``requests`` decodifica cabeçalhos."""
+    try:
+        return texto.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return texto
+
+
+def _retry_after(resp) -> Optional[float]:
+    try:
+        return float(resp.headers.get("Retry-After", ""))
+    except ValueError:
+        return None
 
 
 def _extrair_lista(response) -> list:
@@ -286,9 +318,15 @@ class SINMClient:
         """Busca os dados de uma gleba pelo UUID."""
         return self._get(f"{self._rota('/glebas')}/{uuid_gleba}")
 
-    def listar_glebas(self) -> list:
-        """Lista as glebas do usuário autenticado."""
-        return self._listar(self._rota("/glebas"))
+    def listar_glebas(self, id_externo: Optional[str] = None) -> list:
+        """Lista as glebas do usuário autenticado.
+
+        Parameters
+        ----------
+        id_externo:
+            Filtra pelo ``Talhao.idExterno`` informado no cadastro.
+        """
+        return self._listar(self._rota("/glebas"), _filtro_id_externo(id_externo))
 
     # ------------------------------------------------------------------
     # Análise de Solo
@@ -574,8 +612,8 @@ class SINMClient:
         parciais (projeção completa); sem ele, só os campos de causa e o efeito na
         nota (projeção compacta).
 
-        Leitura causal (v6.2026)
-        ------------------------
+        Leitura causal
+        --------------
         A nota nem sempre vem da média: regras de teto podem fixá-la. Quatro campos
         dizem *qual* fator limitou:
 
@@ -614,9 +652,33 @@ class SINMClient:
         """
         return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}/racional")
 
-    def listar_classificacoes(self) -> list:
-        """Lista todas as classificações do usuário autenticado, da mais recente para a mais antiga."""
-        return self._listar("/api/v1/classificacoes")
+    def listar_classificacoes(self, id_externo: Optional[str] = None) -> list:
+        """Lista todas as classificações do usuário autenticado, da mais recente para a mais antiga.
+
+        Parameters
+        ----------
+        id_externo:
+            Filtra pelo ``Talhao.idExterno`` da gleba classificada.
+        """
+        return self._listar("/api/v1/classificacoes", _filtro_id_externo(id_externo))
+
+    # ------------------------------------------------------------------
+    # Tabelas de domínio
+    # ------------------------------------------------------------------
+
+    def listar_culturas(self) -> list:
+        """Lista as culturas (``codigo`` e ``nome``) aceitas em ``Cultura.codigo``.
+
+        Disponível para qualquer usuário autenticado. Sempre em ``/api/v1``.
+        """
+        return self._get("/api/v1/culturas")
+
+    def listar_satelites(self) -> list:
+        """Lista os satélites (``codigo`` e ``nome``) aceitos nos ``codigoSatelite*``.
+
+        Disponível para qualquer usuário autenticado. Sempre em ``/api/v1``.
+        """
+        return self._get("/api/v1/satelites")
 
     # ------------------------------------------------------------------
     # HTTP helpers
@@ -731,6 +793,18 @@ class SINMClient:
         if raw and "raw" not in body:
             body["raw"] = raw
 
+        if resp.status_code == 401:
+            params = _ler_www_authenticate(resp.headers.get("WWW-Authenticate", ""))
+            descricao = _corrigir_codificacao(params["error_description"]) if "error_description" in params else None
+            if not body.get("detail") and descricao:
+                body.setdefault("title", "Token recusado pela API")
+                body["detail"] = descricao
+                body.pop("raw", None)
+                message = descricao
+            classe = (UsuarioNaoCadastradoError
+                      if descricao and _DESCRICAO_NAO_CADASTRADO.search(descricao)
+                      else NaoAutorizadoError)
+            raise classe(resp.status_code, message, body, erro=params.get("error"), descricao=descricao)
         if resp.status_code == 403:
             roles_necessarios, escopo = _regra_do_endpoint(path, metodo)
             raise PermissaoError(
@@ -747,5 +821,9 @@ class SINMClient:
             raise NotFoundError(resp.status_code, message, body)
         if resp.status_code in (400, 422):
             raise ValidationError(resp.status_code, message, body)
+        if resp.status_code == 408:
+            raise TempoEsgotadoError(resp.status_code, message, body)
+        if resp.status_code == 409:
+            raise ConflitoConcorrenciaError(resp.status_code, message, body, retry_after=_retry_after(resp))
 
         raise APIError(resp.status_code, message, body)

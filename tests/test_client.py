@@ -7,7 +7,16 @@ import responses as rsps_lib
 
 from czarsinm import SINMClient
 from czarsinm.client import API_URLS, _extrair_lista, _roles_para_endpoint
-from czarsinm.exceptions import APIError, NotFoundError, PermissaoError, ValidationError
+from czarsinm.exceptions import (
+    APIError,
+    ConflitoConcorrenciaError,
+    NaoAutorizadoError,
+    NotFoundError,
+    PermissaoError,
+    TempoEsgotadoError,
+    UsuarioNaoCadastradoError,
+    ValidationError,
+)
 
 BASE = API_URLS["hml"]
 
@@ -665,3 +674,119 @@ class TestHandleResponse:
         with pytest.raises(APIError) as exc_info:
             client.listar_glebas()
         assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Filtro por idExterno e tabelas de domínio
+# ---------------------------------------------------------------------------
+
+class TestIdExternoETabelasDeDominio:
+    @rsps_lib.activate
+    def test_listar_glebas_filtra_por_id_externo(self, client):
+        rsps_lib.add(
+            rsps_lib.GET, f"{BASE}/api/v1/glebas", json=[{"uuid": "a"}], status=200,
+            match=[rsps_lib.matchers.query_param_matcher({"idExterno": "TALHAO-7"}, strict_match=False)],
+        )
+        assert client.listar_glebas(id_externo="TALHAO-7") == [{"uuid": "a"}]
+
+    @rsps_lib.activate
+    def test_listar_glebas_v2_filtra_por_id_externo(self, client_v2):
+        rsps_lib.add(
+            rsps_lib.GET, f"{BASE}/api/v2/glebas", json=[], status=200,
+            match=[rsps_lib.matchers.query_param_matcher({"idExterno": "X"}, strict_match=False)],
+        )
+        assert client_v2.listar_glebas(id_externo="X") == []
+
+    @rsps_lib.activate
+    def test_listar_sem_filtro_nao_envia_id_externo(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", json=[], status=200)
+        client.listar_glebas()
+        assert "idExterno" not in rsps_lib.calls[0].request.url
+
+    @rsps_lib.activate
+    def test_listar_classificacoes_filtra_por_id_externo(self, client):
+        rsps_lib.add(
+            rsps_lib.GET, f"{BASE}/api/v1/classificacoes", json=[], status=200,
+            match=[rsps_lib.matchers.query_param_matcher({"idExterno": "TALHAO-7"}, strict_match=False)],
+        )
+        assert client.listar_classificacoes(id_externo="TALHAO-7") == []
+
+    @rsps_lib.activate
+    def test_listar_culturas_sempre_v1(self, client_v2):
+        culturas = [{"codigo": "001", "nome": "Soja"}]
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/culturas", json=culturas, status=200)
+        assert client_v2.listar_culturas() == culturas
+
+    @rsps_lib.activate
+    def test_listar_satelites_sempre_v1(self, client_v2):
+        satelites = [{"codigo": "S01", "nome": "Sentinel-2"}]
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/satelites", json=satelites, status=200)
+        assert client_v2.listar_satelites() == satelites
+
+
+# ---------------------------------------------------------------------------
+# Exceções específicas: 401, 408, 409
+# ---------------------------------------------------------------------------
+
+class TestExcecoesEspecificas:
+    @rsps_lib.activate
+    def test_409_conflito_com_retry_after(self, client, dado_gleba):
+        rsps_lib.add(
+            rsps_lib.POST, f"{BASE}/api/v1/glebas", status=409,
+            json={"title": "Conflito de concorrência", "codigoErro": "RN409", "detail": "reenvie"},
+            headers={"Retry-After": "1"},
+        )
+        with pytest.raises(ConflitoConcorrenciaError) as exc_info:
+            client.cadastrar_gleba(dado_gleba)
+        assert exc_info.value.retry_after == 1.0
+        assert isinstance(exc_info.value, APIError)
+        assert "Retry-After" in exc_info.value.format_report()
+
+    @rsps_lib.activate
+    def test_409_sem_retry_after(self, client, dado_gleba):
+        rsps_lib.add(rsps_lib.POST, f"{BASE}/api/v1/glebas", status=409, json={})
+        with pytest.raises(ConflitoConcorrenciaError) as exc_info:
+            client.cadastrar_gleba(dado_gleba)
+        assert exc_info.value.retry_after is None
+
+    @rsps_lib.activate
+    def test_408_tempo_esgotado(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", status=408,
+                     json={"codigoErro": "RN90", "detail": "Read timed out"})
+        with pytest.raises(TempoEsgotadoError):
+            client.listar_glebas()
+
+    @rsps_lib.activate
+    def test_401_usuario_nao_cadastrado(self, client):
+        descricao = "Service account 'service-account-x' não cadastrado no sistema."
+        # requests decodifica cabeçalhos como Latin-1; a API manda UTF-8.
+        cabecalho = ('Bearer error="invalid_token", error_description="' + descricao + '", '
+                     'error_uri="https://tools.ietf.org/html/rfc6750#section-3.1"')
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", status=401, body=b"",
+                     headers={"WWW-Authenticate": cabecalho.encode("utf-8").decode("latin-1")})
+        with pytest.raises(UsuarioNaoCadastradoError) as exc_info:
+            client.listar_glebas()
+        err = exc_info.value
+        assert isinstance(err, NaoAutorizadoError)
+        assert err.erro == "invalid_token"
+        assert err.descricao == descricao
+        report = err.format_report()
+        assert "não cadastrado" in report
+        assert "equipe SiNM" in report
+
+    @rsps_lib.activate
+    def test_401_token_expirado_nao_e_cadastro(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", status=401, body=b"",
+                     headers={"WWW-Authenticate": 'Bearer error="invalid_token", '
+                                                  'error_description="Jwt expired at 2026-11-03T10:00:00Z"'})
+        with pytest.raises(NaoAutorizadoError) as exc_info:
+            client.listar_glebas()
+        assert not isinstance(exc_info.value, UsuarioNaoCadastradoError)
+        assert "Jwt expired" in str(exc_info.value)
+
+    @rsps_lib.activate
+    def test_401_sem_cabecalho(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", status=401, body=b"")
+        with pytest.raises(NaoAutorizadoError) as exc_info:
+            client.listar_glebas()
+        assert exc_info.value.descricao is None
