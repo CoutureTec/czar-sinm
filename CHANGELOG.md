@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [0.4.0] — 2026-11-03
+
 ### Adicionado
 - `tipoAmostragem` em `AnaliseSolo`, `AnaliseSoloQuimica` e `AnaliseSoloFisica`
   (`TIPO_AMOSTRAGEM_GRADE_REGULAR` — 1 amostra a cada 25 ha, assumido pela API quando
