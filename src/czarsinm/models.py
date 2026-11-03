@@ -11,12 +11,10 @@ Contratos v1 e v2
 Os modelos serializam para os dois contratos da API. ``to_dict()`` aceita o
 parâmetro ``contrato`` (``'v1'``, o padrão, ou ``'v2'``):
 
-- **v1** — contrato congelado: aceita os nomes canônicos e os legados. Onde a
-  chave canônica ainda não existe em todos os ambientes (``betaGlicosidase``,
-  estreando na v6.2026 de homologação), o payload leva **as duas grafias** — é o
-  payload de transição recomendado pela API, e o ambiente ignora a que não
-  conhece.
-- **v2** — contrato limpo (estreia em homologação em 04/08/2026): só nomes
+- **v1** — contrato congelado: aceita os nomes canônicos e os legados. Para
+  ``betaGlicosidase`` o payload leva **as duas grafias** (canônica e legada),
+  que o v1 aceita.
+- **v2** — contrato limpo: só nomes
   canônicos e ``cnpjLaboratorio`` obrigatório. Nome legado enviado ao v2 é
   descartado **em silêncio**, sem erro — por isso os modelos nunca os emitem no v2.
   Na gleba, a cultura a classificar é declarada em ``culturaAlvo`` (soja ou milho
@@ -62,6 +60,20 @@ def _validar_contrato(contrato: str) -> str:
     return contrato
 
 
+def _exigir(obj, *campos: str) -> None:
+    """Valida campos obrigatórios declarados com default ``None``.
+
+    Alguns modelos têm campos opcionais na API antes de campos obrigatórios. Para
+    não mudar a ordem posicional, os obrigatórios que vêm depois recebem default
+    ``None`` e são conferidos aqui, na construção.
+    """
+    faltando = [c for c in campos if getattr(obj, c) is None]
+    if faltando:
+        raise TypeError(
+            f"{type(obj).__name__}: campo(s) obrigatório(s) não informado(s): {', '.join(faltando)}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Gleba / Talhão
 # ---------------------------------------------------------------------------
@@ -80,17 +92,20 @@ class Produtor:
 
 @dataclass
 class Propriedade:
-    """Dados da propriedade rural."""
-    nome: str
-    """Nome da fazenda/propriedade."""
-    codigoCar: str
-    """Código CAR (43 caracteres). Ex: 'MT-5107248-1025F299474640148FE845C7A0B62635'"""
-    codigoIbge: str
-    """Código IBGE do município. Ex: '3509502'"""
-    poligono: str
-    """Polígono WKT da propriedade. Ex: 'POLYGON ((-58.91 -13.50, ...))'"""
+    """Dados da propriedade rural. Só ``codigoCar`` é obrigatório."""
+    nome: Optional[str] = None
+    """Nome da fazenda/propriedade (até 60 caracteres). Opcional."""
+    codigoCar: Optional[str] = None
+    """Código CAR (43 caracteres). **Obrigatório**. Ex: 'MT-5107248-1025F299474640148FE845C7A0B62635'"""
+    codigoIbge: Optional[str] = None
+    """Código IBGE do município (7 dígitos). Opcional. Ex: '3509502'"""
+    poligono: Optional[str] = None
+    """Polígono WKT da propriedade. Opcional. Ex: 'POLYGON ((-58.91 -13.50, ...))'"""
     cnpj: Optional[str] = None
     """CNPJ da empresa (somente dígitos, 14 caracteres). Opcional."""
+
+    def __post_init__(self) -> None:
+        _exigir(self, "codigoCar")
 
     def to_dict(self) -> dict:
         return _remove_none(asdict(self))
@@ -105,10 +120,19 @@ class Talhao:
     """Área em hectares."""
     tipoProdutor: str
     """Tipo de produtor: 'Proprietário' ou 'Arrendatário'."""
-    plantioContorno: int
-    """Plantio em contorno: 0 (não) ou 1 (sim)."""
+    plantioContorno: Optional[int] = None
+    """Plantio em contorno: 0 (não) ou 1 (sim). Opcional."""
     cnpjOperador: Optional[str] = None
     """CNPJ da empresa operadora (client ID no Keycloak). Opcional."""
+    idExterno: Optional[str] = None
+    """Identificador da gleba no sistema do integrador (até 100 caracteres). Opcional e
+    não precisa ser único; serve para filtrar ``listar_glebas`` e ``listar_classificacoes``.
+    Não use dado pessoal (é gravado sem criptografia). Na atualização, ``None`` mantém o
+    valor gravado e ``""`` o remove."""
+
+    def __post_init__(self) -> None:
+        if self.idExterno is not None and len(self.idExterno) > 100:
+            raise ValueError(f"idExterno aceita até 100 caracteres (recebeu {len(self.idExterno)}).")
 
     def to_dict(self) -> dict:
         return _remove_none(asdict(self))
@@ -126,7 +150,8 @@ class Operacao:
 @dataclass
 class TipoOperacao:
     tipo: str
-    """Tipo de operação. Ex: 'ARAÇÃO', 'GRADAGEM', 'PLANTIO_DIRETO'."""
+    """Tipo de operação. Ex: 'ARAÇÃO', 'GRADAGEM', 'SUBSOLAGEM', 'ESCARIFICAÇÃO'.
+    Consulte os valores possíveis na documentação (tabela `tipo_operacao`)."""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -138,14 +163,14 @@ class Manejo:
     data: str
     """Data da operação (formato 'YYYY-MM-DD')."""
     operacao: Operacao
-    tipoOperacao: TipoOperacao
+    tipoOperacao: Optional[TipoOperacao] = None
+    """Tipo da operação. Opcional."""
 
     def to_dict(self) -> dict:
-        return {
-            "data": self.data,
-            "operacao": self.operacao.to_dict(),
-            "tipoOperacao": self.tipoOperacao.to_dict(),
-        }
+        d = {"data": self.data, "operacao": self.operacao.to_dict()}
+        if self.tipoOperacao is not None:
+            d["tipoOperacao"] = self.tipoOperacao.to_dict()
+        return d
 
 
 @dataclass
@@ -389,16 +414,20 @@ class Ponto:
 
 @dataclass
 class AmostraQuimica:
-    """Amostra química de solo coletada (AmostraQuimicaInput)."""
-    cpfResponsavelColeta: str
-    """CPF do responsável pela coleta (somente dígitos)."""
-    dataColeta: str
+    """Amostra química de solo coletada (AmostraQuimicaInput).
+
+    Só ``cpfResponsavelColeta`` e os campos marcados como opcionais podem faltar; os
+    demais são obrigatórios e conferidos na construção (``TypeError``).
+    """
+    cpfResponsavelColeta: Optional[str] = None
+    """CPF do responsável pela coleta (somente dígitos). Opcional."""
+    dataColeta: Optional[str] = None
     """Data da coleta (formato 'YYYY-MM-DD')."""
-    longitude: float
+    longitude: Optional[float] = None
     """Longitude do ponto de coleta."""
-    latitude: float
+    latitude: Optional[float] = None
     """Latitude do ponto de coleta."""
-    camada: str
+    camada: Optional[str] = None
     """Código da camada (6 caracteres). Usados no cálculo: '00_010', '10_020',
     '00_020', '20_040' (combinações: '00_020'+'20_040' OU '00_010'+'10_020'+'20_040').
     Qualquer código é aceito e o envio é persistido: um código fora do domínio é
@@ -406,19 +435,19 @@ class AmostraQuimica:
     "Camada não prevista"; '40_060' e '60_100' são válidos porém não usados no cálculo
     e geram o aviso "Camada não utilizada na classificação". Não enviar '00_000'
     (sentinela interno; tratado como inválido)."""
-    calcio: float
+    calcio: Optional[float] = None
     """Cálcio em cmolc/dm³ (0–50)."""
-    magnesio: float
+    magnesio: Optional[float] = None
     """Magnésio em cmolc/dm³ (0–30)."""
-    potassio: float
+    potassio: Optional[float] = None
     """Potássio em mg/dm³ (0–1000)."""
-    aluminio: float
+    aluminio: Optional[float] = None
     """Alumínio em cmolc/dm³ (0–100)."""
-    acidezPotencial: float
+    acidezPotencial: Optional[float] = None
     """Acidez potencial H+Al em cmolc/dm³ (0–100)."""
-    enxofre: float
+    enxofre: Optional[float] = None
     """Enxofre em mg/dm³ (0–100)."""
-    mos: float
+    mos: Optional[float] = None
     """Matéria orgânica do solo em g/kg (0–300)."""
     sodio: Optional[float] = None
     """Sódio em mg/dm³ (0–1000). Opcional."""
@@ -433,9 +462,9 @@ class AmostraQuimica:
     arilsulfatase: Optional[float] = None
     """Arilsulfatase em nmol/g/h (0–800). Opcional."""
     betaGlicosidase: Optional[float] = None
-    """Beta-glicosidase em nmol/g/h (0–500). Opcional. Grafia canônica desde a
-    v6.2026 — a antiga `betaGlicosidade` (erro de grafia) segue aceita no envio ao
-    /api/v1, porém DEPRECIADA, e é ignorada pelo /api/v2."""
+    """Beta-glicosidase em nmol/g/h (0–500). Opcional. Grafia canônica — a
+    antiga `betaGlicosidade` (erro de grafia) segue aceita no envio ao /api/v1,
+    porém DEPRECIADA, e é ignorada pelo /api/v2."""
     betaGlicosidade: Optional[float] = None
     """DEPRECIADO — use `betaGlicosidase`. Mantido para não quebrar código existente:
     se informado sozinho, alimenta o campo canônico (com DeprecationWarning)."""
@@ -445,6 +474,8 @@ class AmostraQuimica:
     """Pontos geográficos adicionais. Opcional."""
 
     def __post_init__(self) -> None:
+        _exigir(self, "dataColeta", "longitude", "latitude", "camada", "calcio", "magnesio",
+                "potassio", "aluminio", "acidezPotencial", "enxofre", "mos")
         if self.betaGlicosidade is None:
             return
         if self.betaGlicosidase is None:
@@ -466,8 +497,8 @@ class AmostraQuimica:
         _validar_contrato(contrato)
         d = _remove_none(asdict(self))
         # A grafia é reconciliada em __post_init__; a serialização decide só quais
-        # chaves vão no fio. O v1 leva as duas (a produção ainda só conhece a
-        # legada); o v2 aceita apenas a canônica e descartaria a legada em silêncio.
+        # chaves vão no fio. O v1 leva as duas (aceita ambas); o v2
+        # aceita apenas a canônica e descartaria a legada em silêncio.
         d.pop("betaGlicosidade", None)
         d.pop("betaGlicosidase", None)
         if self.betaGlicosidase is not None:
@@ -516,11 +547,17 @@ class AmostraFisica:
 # Identificação comum aos payloads de análise de solo
 # ---------------------------------------------------------------------------
 
+TIPO_AMOSTRAGEM_GRADE_REGULAR = "GRADE_REGULAR"
+"""Amostragem em grade regular: 1 amostra a cada 25 ha. É o que a API assume sem ``tipoAmostragem``."""
+TIPO_AMOSTRAGEM_ZONA_HOMOGENEA = "ZONA_HOMOGENEA"
+"""Amostragem por zona homogênea: 1 amostra a cada 1000 ha."""
+TIPOS_AMOSTRAGEM = (TIPO_AMOSTRAGEM_GRADE_REGULAR, TIPO_AMOSTRAGEM_ZONA_HOMOGENEA)
+
 class _IdentificacaoAnalise:
     """Serialização dos campos de identificação comuns às análises de solo.
 
     Espelha o ``AnaliseSoloInputBase`` (v1) / ``AnaliseSoloV2InputBase`` (v2) da API:
-    ``cpfProdutor``, ``cnpjPropriedade`` e ``cnpjLaboratorio``. A chave legada ``cnpj``
+    ``cpfProdutor``, ``cnpjPropriedade``, ``cnpjLaboratorio`` e ``tipoAmostragem``. A chave legada ``cnpj``
     **não** é emitida: os três ambientes (dev/hml/prd) já aceitam a canônica
     ``cnpjPropriedade``, e o v2 descartaria a legada em silêncio.
     """
@@ -538,6 +575,13 @@ class _IdentificacaoAnalise:
             d["cnpjPropriedade"] = self.cnpjPropriedade
         if self.cnpjLaboratorio:
             d["cnpjLaboratorio"] = self.cnpjLaboratorio
+        if self.tipoAmostragem is not None:
+            if self.tipoAmostragem not in TIPOS_AMOSTRAGEM:
+                raise ValueError(
+                    f"tipoAmostragem '{self.tipoAmostragem}' não reconhecido. "
+                    f"Use um de: {', '.join(TIPOS_AMOSTRAGEM)}."
+                )
+            d["tipoAmostragem"] = self.tipoAmostragem
         return d
 
 
@@ -559,6 +603,10 @@ class AnaliseSoloQuimica(_IdentificacaoAnalise):
     """CNPJ do laboratório (14 dígitos). Opcional no v1, **obrigatório** no v2.
     Só vincula a análise ao laboratório se ele estiver cadastrado na base — senão o
     envio é aceito com a inconsistência RN19."""
+    tipoAmostragem: Optional[str] = None
+    """Tipo de amostragem: ``GRADE_REGULAR`` (1 amostra a cada 25 ha, assumido pela API
+    quando omitido) ou ``ZONA_HOMOGENEA`` (1 amostra a cada 1000 ha). Define a densidade
+    amostral exigida. Opcional."""
 
     def to_dict(self, contrato: str = "v1") -> dict:
         _validar_contrato(contrato)
@@ -584,6 +632,10 @@ class AnaliseSoloFisica(_IdentificacaoAnalise):
     """CNPJ da propriedade (14 dígitos). Opcional."""
     cnpjLaboratorio: Optional[str] = None
     """CNPJ do laboratório (14 dígitos). Opcional no v1, **obrigatório** no v2."""
+    tipoAmostragem: Optional[str] = None
+    """Tipo de amostragem: ``GRADE_REGULAR`` (1 amostra a cada 25 ha, assumido pela API
+    quando omitido) ou ``ZONA_HOMOGENEA`` (1 amostra a cada 1000 ha). Define a densidade
+    amostral exigida. Opcional."""
 
     def to_dict(self, contrato: str = "v1") -> dict:
         _validar_contrato(contrato)
@@ -613,6 +665,10 @@ class AnaliseSolo(_IdentificacaoAnalise):
     amostrasFisicas: list[AmostraFisica] = field(default_factory=list)
     """Mínimo 1 amostra física obrigatória no payload combinado. Para enviar só a
     química, use :class:`AnaliseSoloQuimica` no endpoint por tipo."""
+    tipoAmostragem: Optional[str] = None
+    """Tipo de amostragem: ``GRADE_REGULAR`` (1 amostra a cada 25 ha, assumido pela API
+    quando omitido) ou ``ZONA_HOMOGENEA`` (1 amostra a cada 1000 ha). Define a densidade
+    amostral exigida. Opcional."""
 
     def to_dict(self, contrato: str = "v1") -> dict:
         _validar_contrato(contrato)
@@ -646,6 +702,7 @@ class AnaliseSolo(_IdentificacaoAnalise):
             cpfProdutor=self.cpfProdutor,
             cnpjPropriedade=self.cnpjPropriedade,
             cnpjLaboratorio=self.cnpjLaboratorio,
+            tipoAmostragem=self.tipoAmostragem,
         )
         fisica = None
         if self.amostrasFisicas:
@@ -654,6 +711,7 @@ class AnaliseSolo(_IdentificacaoAnalise):
                 cpfProdutor=self.cpfProdutor,
                 cnpjPropriedade=self.cnpjPropriedade,
                 cnpjLaboratorio=self.cnpjLaboratorio,
+                tipoAmostragem=self.tipoAmostragem,
             )
         return quimica, fisica
 
@@ -701,14 +759,17 @@ class InterpretacaoCoberturaSolo:
 class InterpretacaoCultura:
     """Interpretação de cultura via satélite."""
     tipoCultivo: str
-    """Tipo de cultivo. Ex: 'Cultivo de 2ª safra'."""
+    """Tipo de cultivo (até 60 caracteres). Valores esperados: 'Cultivo de 1ª safra',
+    'Cultivo de 2ª safra', 'Cultivo de 3ª safra', 'Cultivo de Inverno', 'Semi-perene', 'Perene'."""
     dataInicio: str
     """Data de início (formato 'YYYY-MM-DD')."""
     dataFim: str
     """Data de fim (formato 'YYYY-MM-DD')."""
+    cultura: Optional[str] = None
+    """Nome da cultura identificada (até 60 caracteres). Opcional. Ex: 'Soja'."""
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _remove_none(asdict(self))
 
 
 @dataclass
@@ -743,18 +804,19 @@ class SensoriamentoRemoto:
     """Data inicial do período monitorado (formato 'YYYY-MM-DD')."""
     dataFinal: str
     """Data final do período monitorado (formato 'YYYY-MM-DD')."""
-    declividadeMedia: int
-    """Declividade média do talhão (0–100), valor inteiro."""
-    plantioContorno: int
-    """Plantio em contorno detectado: 0 ou 1."""
-    terraceamento: int
-    """Terraceamento detectado: 0 ou 1."""
-    codigoSateliteDeclividadeMedia: str
-    """Código do satélite usado para declividade. Ex: 'S09'. Valores conhecidos: 'S01'–'S09'
+    declividadeMedia: Optional[int] = None
+    """Declividade média do talhão (0–100), valor inteiro. Opcional na API, mas entra no
+    cálculo do nível de manejo."""
+    plantioContorno: Optional[int] = None
+    """Plantio em contorno detectado: 0 ou 1. Opcional."""
+    terraceamento: Optional[int] = None
+    """Terraceamento detectado: 0 ou 1. Opcional."""
+    codigoSateliteDeclividadeMedia: Optional[str] = None
+    """**Obrigatório**. Código do satélite usado para declividade. Ex: 'S09'. Valores conhecidos: 'S01'–'S09'
     (ver GET /api/v1/satelites). Código desconhecido é aceito, mas gera inconsistência na API
     (vide `Indice.codigoSatelite`). Não enviar 'S00'."""
-    indices: list[Indice]
-    """Mínimo 1 índice obrigatório."""
+    indices: Optional[list[Indice]] = None
+    """**Obrigatório**: mínimo 1 índice."""
     cpfProdutor: Optional[str] = None
     """CPF do produtor (obrigatório se não houver chaveClassificacaoNM)."""
     cnpjPropriedade: Optional[str] = None
@@ -769,20 +831,23 @@ class SensoriamentoRemoto:
     interpretacoesCultura: list[InterpretacaoCultura] = field(default_factory=list)
     interpretacoesManejo: list[InterpretacaoManejo] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        _exigir(self, "codigoSateliteDeclividadeMedia", "indices")
+
     def to_dict(self, contrato: str = "v1") -> dict:
         _validar_contrato(contrato)
         d: dict = {
             "dataInicial": self.dataInicial,
             "dataFinal": self.dataFinal,
-            "declividadeMedia": self.declividadeMedia,
-            "plantioContorno": self.plantioContorno,
-            "terraceamento": self.terraceamento,
             "codigoSateliteDeclividadeMedia": self.codigoSateliteDeclividadeMedia,
             "indices": [i.to_dict() for i in self.indices],
             "interpretacoesCoberturaSolo": [c.to_dict() for c in self.interpretacoesCoberturaSolo],
             "interpretacoesCultura": [c.to_dict() for c in self.interpretacoesCultura],
             "interpretacoesManejo": [m.to_dict() for m in self.interpretacoesManejo],
         }
+        for campo in ("declividadeMedia", "plantioContorno", "terraceamento"):
+            if getattr(self, campo) is not None:
+                d[campo] = getattr(self, campo)
         if self.cpfProdutor:
             d["cpfProdutor"] = self.cpfProdutor
         if self.cnpjPropriedade:
