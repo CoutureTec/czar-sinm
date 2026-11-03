@@ -202,11 +202,12 @@ def analise_solo_fisica(amostra_fisica):
 
 
 @pytest.fixture
-def analise_solo(amostra):
+def analise_solo(amostra, amostra_fisica):
     return AnaliseSolo(
         cpfProdutor="68122528082",
         cnpjPropriedade="54194116000138",
         amostrasQuimicas=[amostra],
+        amostrasFisicas=[amostra_fisica],
     )
 
 

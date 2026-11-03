@@ -58,9 +58,15 @@ class TestRolesParaEndpoint:
         roles = _roles_para_endpoint("/api/v1/sensoriamentos-remotos/CHAVE")
         assert "OPERADOR_SENSORIAMENTO_REMOTO" in roles
 
-    def test_classificacoes(self):
-        roles = _roles_para_endpoint("/api/v1/classificacoes/CHAVE")
-        assert "OPERADOR_CONTRATOS" in roles
+    def test_classificacoes_nao_exige_role(self):
+        """A chave dá acesso à consulta: a API exige só autenticação."""
+        assert _roles_para_endpoint("/api/v1/classificacoes/CHAVE") == []
+        assert _roles_para_endpoint("/api/v1/classificacoes") == []
+
+    def test_delete_sensoriamento_exige_administrador(self):
+        assert _roles_para_endpoint("/api/v2/sensoriamentos-remotos/U", "DELETE") == ["ADMINISTRADOR"]
+        assert _roles_para_endpoint("/api/v2/sensoriamentos-remotos/U", "PUT") == \
+            ["OPERADOR_SENSORIAMENTO_REMOTO"]
 
     def test_endpoint_desconhecido(self):
         assert _roles_para_endpoint("/api/v1/desconhecido") == []
@@ -139,6 +145,34 @@ class TestCadastrarGleba:
         rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/glebas", json=[{"uuid": "a"}, {"uuid": "b"}], status=200)
         result = client.listar_glebas()
         assert len(result) == 2
+
+    @rsps_lib.activate
+    def test_listar_percorre_todas_as_paginas(self, client):
+        def pagina(n, itens):
+            return {
+                "_embedded": {"glebaListagemModelList": itens},
+                "page": {"size": 2, "totalElements": 5, "totalPages": 3, "number": n},
+            }
+        for n, itens in enumerate([[{"uuid": "a"}, {"uuid": "b"}], [{"uuid": "c"}, {"uuid": "d"}], [{"uuid": "e"}]]):
+            rsps_lib.add(
+                rsps_lib.GET, f"{BASE}/api/v1/glebas", json=pagina(n, itens), status=200,
+                match=[rsps_lib.matchers.query_param_matcher({"page": str(n), "size": "100"})],
+            )
+        result = client.listar_glebas()
+        assert [g["uuid"] for g in result] == ["a", "b", "c", "d", "e"]
+        assert len(rsps_lib.calls) == 3
+
+    @rsps_lib.activate
+    def test_listar_vazio_faz_uma_chamada(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/classificacoes",
+                     json={"_links": {}, "page": {"size": 100, "totalElements": 0, "totalPages": 0, "number": 0}},
+                     status=200)
+        assert client.listar_classificacoes() == []
+        assert len(rsps_lib.calls) == 1
+
+    def test_tamanho_pagina_invalido(self):
+        with pytest.raises(ValueError, match="tamanho_pagina"):
+            SINMClient("u", "p", "c", "s", ambiente="hml", tamanho_pagina=0)
 
     @rsps_lib.activate
     def test_listar_glebas_paged_model(self, client):
@@ -487,7 +521,18 @@ class TestCadastrarSensoriamentoRemoto:
         rsps_lib.add(
             rsps_lib.DELETE, f"{BASE}/api/v1/sensoriamentos-remotos/uuid-sr", body=b"", status=204
         )
-        assert client.remover_sensoriamento_remoto("uuid-sr") == {}
+        with pytest.deprecated_call():
+            assert client.remover_sensoriamento_remoto("uuid-sr") == {}
+
+    @rsps_lib.activate
+    def test_remover_403_aponta_administrador(self, client):
+        rsps_lib.add(rsps_lib.DELETE, f"{BASE}/api/v1/sensoriamentos-remotos/uuid-sr", status=403)
+        with pytest.deprecated_call(), pytest.raises(PermissaoError) as exc_info:
+            client.remover_sensoriamento_remoto("uuid-sr")
+        err = exc_info.value
+        assert err.roles_necessarios == ["ADMINISTRADOR"]
+        assert err.escopo == "realm"
+        assert "administrativa" in err.format_report()
 
 
 # ---------------------------------------------------------------------------
@@ -562,6 +607,31 @@ class TestHandleResponse:
         assert "OPERADOR_CONTRATOS" in err.roles_necessarios
         # roles do usuário vêm do mock de auth
         assert "OPERADOR_CONTRATOS" in err.roles_usuario
+        assert err.roles_por_client == {"client-id": ["OPERADOR_CONTRATOS", "BETA_USER"]}
+        assert err.escopo == "client"
+
+    @rsps_lib.activate
+    def test_403_compara_com_client_roles(self, client, dado_gleba):
+        """Os roles OPERADOR_* são de client (CNPJ): o relatório não os procura nos realm roles."""
+        client._auth.roles = ["offline_access", "uma_authorization"]
+        rsps_lib.add(rsps_lib.POST, f"{BASE}/api/v1/glebas", json={}, status=403)
+        with pytest.raises(PermissaoError) as exc_info:
+            client.cadastrar_gleba(dado_gleba)
+        report = exc_info.value.format_report()
+        assert "✓ OPERADOR_CONTRATOS  ← em client-id" in report
+        assert "✗ OPERADOR_CONTRATOS" not in report
+        assert "dona do dado" in report
+
+    @rsps_lib.activate
+    def test_403_em_classificacao_nao_pede_role(self, client):
+        rsps_lib.add(rsps_lib.GET, f"{BASE}/api/v1/classificacoes/CHAVE", json={}, status=403)
+        with pytest.raises(PermissaoError) as exc_info:
+            client.consultar_classificacao("CHAVE")
+        err = exc_info.value
+        assert err.roles_necessarios == []
+        report = err.format_report()
+        assert "não exige role" in report
+        assert "Solicite" not in report
 
     @rsps_lib.activate
     def test_404_levanta_not_found_error(self, client):

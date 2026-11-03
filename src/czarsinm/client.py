@@ -44,30 +44,44 @@ sensoriamento remoto. Classificação e análises disponíveis existem só no ``
 continuam sendo chamadas lá, qualquer que seja a versão configurada.
 """
 
-# Roles exigidos por sufixo de endpoint, já sem o prefixo /api/vN
-# (ordem: mais específico primeiro)
+ESCOPO_CLIENT = "client"
+"""Role de client: atribuído por empresa (client = CNPJ) e exigido na empresa dona do dado."""
+ESCOPO_REALM = "realm"
+"""Role de realm: vale para o sistema todo (ex.: ``ADMINISTRADOR``)."""
+
+# Roles exigidos por método e sufixo de endpoint, já sem o prefixo /api/vN
+# (ordem: mais específico primeiro; método None casa qualquer método).
+# /classificacoes não aparece: exige só autenticação — a chave dá acesso à consulta.
 _ENDPOINT_ROLES = [
-    ("/glebas",                    ["OPERADOR_CONTRATOS"]),
-    ("/classificacoes",            ["OPERADOR_CONTRATOS",]),
-    ("/analises-solo/disponiveis", ["OPERADOR_ANALISE_SOLO", "OPERADOR_CONTRATOS"]),
-    ("/analises-solo",             ["OPERADOR_ANALISE_SOLO"]),
-    ("/sensoriamentos-remotos",    ["OPERADOR_SENSORIAMENTO_REMOTO"]),
+    ("DELETE", "/sensoriamentos-remotos",    ["ADMINISTRADOR"], ESCOPO_REALM),
+    (None,     "/glebas",                    ["OPERADOR_CONTRATOS"], ESCOPO_CLIENT),
+    (None,     "/analises-solo/disponiveis", ["OPERADOR_ANALISE_SOLO", "OPERADOR_CONTRATOS"], ESCOPO_CLIENT),
+    (None,     "/analises-solo",             ["OPERADOR_ANALISE_SOLO"], ESCOPO_CLIENT),
+    (None,     "/sensoriamentos-remotos",    ["OPERADOR_SENSORIAMENTO_REMOTO"], ESCOPO_CLIENT),
 ]
 
 _PREFIXO_VERSAO = re.compile(r"^/api/v\d+")
 
 
-def _roles_para_endpoint(path: str) -> list:
-    """Roles exigidos pelo endpoint, independentemente da versão do contrato.
+def _regra_do_endpoint(path: str, metodo: Optional[str] = None) -> tuple:
+    """``(roles, escopo)`` exigidos pelo endpoint, independentemente da versão do contrato.
 
     A autorização é idêntica no v1 e no v2 (só o payload muda), então o prefixo
-    ``/api/vN`` é descartado antes de casar o sufixo.
+    ``/api/vN`` é descartado antes de casar o sufixo. Endpoint sem regra devolve
+    ``([], None)``: exige só autenticação.
     """
     sufixo = _PREFIXO_VERSAO.sub("", path, count=1)
-    for prefix, roles in _ENDPOINT_ROLES:
+    for metodo_regra, prefix, roles, escopo in _ENDPOINT_ROLES:
+        if metodo_regra and metodo_regra != (metodo or "").upper():
+            continue
         if sufixo.startswith(prefix):
-            return roles
-    return []
+            return roles, escopo
+    return [], None
+
+
+def _roles_para_endpoint(path: str, metodo: Optional[str] = None) -> list:
+    """Roles exigidos pelo endpoint (ver :func:`_regra_do_endpoint`)."""
+    return _regra_do_endpoint(path, metodo)[0]
 
 
 def _extrair_lista(response) -> list:
@@ -132,6 +146,7 @@ class SINMClient:
         timeout: int = 60,
         grant_type: Optional[str] = None,
         api_version: str = "v1",
+        tamanho_pagina: int = 100,
     ):
         """
         Parameters
@@ -174,6 +189,10 @@ class SINMClient:
             contratos, então trocar a versão não exige mudar o código que monta
             os payloads — exceto o cadastro combinado de análise de solo, que só
             existe no v1.
+        tamanho_pagina:
+            Itens pedidos por página nas listagens. Os métodos ``listar_*``
+            percorrem todas as páginas e devolvem a lista completa; o tamanho só
+            muda quantas requisições são feitas.
         """
         if ambiente not in API_URLS and base_url is None:
             raise ValueError(
@@ -181,6 +200,8 @@ class SINMClient:
                 "Para ambientes customizados, informe 'base_url' "
                 "(ou defina SINM_BACKEND_URL no arquivo .env)."
             )
+        if tamanho_pagina < 1:
+            raise ValueError("tamanho_pagina deve ser maior que zero.")
         if api_version not in API_VERSIONS:
             raise ValueError(
                 f"api_version '{api_version}' não reconhecida. "
@@ -201,6 +222,7 @@ class SINMClient:
         self._proxies = proxies
         self._timeout = timeout
         self._api_version = api_version
+        self._tamanho_pagina = tamanho_pagina
         self._session = requests.Session()
 
     @property
@@ -266,7 +288,7 @@ class SINMClient:
 
     def listar_glebas(self) -> list:
         """Lista as glebas do usuário autenticado."""
-        return _extrair_lista(self._get(self._rota("/glebas")))
+        return self._listar(self._rota("/glebas"))
 
     # ------------------------------------------------------------------
     # Análise de Solo
@@ -333,7 +355,7 @@ class SINMClient:
         """
         if self._api_version != "v1":
             return self.listar_analises_solo_quimicas()
-        return _extrair_lista(self._get("/api/v1/analises-solo"))
+        return self._listar("/api/v1/analises-solo")
 
     # -- Análise de solo por tipo (química / física) --------------------
 
@@ -371,7 +393,7 @@ class SINMClient:
 
     def listar_analises_solo_quimicas(self) -> list:
         """Lista as análises de solo químicas do usuário autenticado."""
-        return _extrair_lista(self._get(self._rota("/analises-solo/quimica")))
+        return self._listar(self._rota("/analises-solo/quimica"))
 
     def cadastrar_analise_solo_fisica(
         self,
@@ -405,7 +427,7 @@ class SINMClient:
 
     def listar_analises_solo_fisicas(self) -> list:
         """Lista as análises de solo físicas do usuário autenticado."""
-        return _extrair_lista(self._get(self._rota("/analises-solo/fisica")))
+        return self._listar(self._rota("/analises-solo/fisica"))
 
     # -- Disponibilidade por CPF do produtor ----------------------------
 
@@ -497,10 +519,21 @@ class SINMClient:
 
     def listar_sensoriamentos_remotos(self) -> list:
         """Lista os sensoriamentos do usuário autenticado."""
-        return _extrair_lista(self._get(self._rota("/sensoriamentos-remotos")))
+        return self._listar(self._rota("/sensoriamentos-remotos"))
 
     def remover_sensoriamento_remoto(self, uuid_sensoriamento: str) -> dict:
-        """Remove um sensoriamento remoto pelo UUID (204 → dict vazio)."""
+        """DEPRECIADO — uso administrativo: a API só aceita a remoção com o realm
+        role ``ADMINISTRADOR``; para integradores responde 403 (:class:`PermissaoError`).
+
+        Para corrigir um sensoriamento, use :meth:`atualizar_sensoriamento_remoto`.
+        Remove um sensoriamento remoto pelo UUID (204 → dict vazio).
+        """
+        warnings.warn(
+            "remover_sensoriamento_remoto está depreciado: a remoção é restrita a "
+            "ADMINISTRADOR na API. Para corrigir, use atualizar_sensoriamento_remoto.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._delete(f"{self._rota('/sensoriamentos-remotos')}/{uuid_sensoriamento}")
 
     # ------------------------------------------------------------------
@@ -582,12 +615,32 @@ class SINMClient:
         return self._get(f"/api/v1/classificacoes/{chave_classificacao_nm}/racional")
 
     def listar_classificacoes(self) -> list:
-        """Lista todas as classificações do usuário autenticado."""
-        return _extrair_lista(self._get("/api/v1/classificacoes"))
+        """Lista todas as classificações do usuário autenticado, da mais recente para a mais antiga."""
+        return self._listar("/api/v1/classificacoes")
 
     # ------------------------------------------------------------------
     # HTTP helpers
     # ------------------------------------------------------------------
+
+    def _listar(self, path: str, params: Optional[dict] = None) -> list:
+        """GET paginado: percorre todas as páginas e devolve os itens concatenados.
+
+        A API pagina as listagens (página padrão de 20 itens). Resposta sem
+        metadados de página (lista simples) é devolvida como veio.
+        """
+        itens: list = []
+        pagina = 0
+        while True:
+            consulta = {**(params or {}), "page": pagina, "size": self._tamanho_pagina}
+            resp = self._get(path, params=consulta)
+            lote = _extrair_lista(resp)
+            if not isinstance(lote, list):
+                return lote
+            itens.extend(lote)
+            info = resp.get("page") if isinstance(resp, dict) else None
+            if not isinstance(info, dict) or pagina + 1 >= int(info.get("totalPages") or 0):
+                return itens
+            pagina += 1
 
     def _headers(self) -> dict:
         return {
@@ -610,7 +663,7 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "POST")
 
     def _put(self, path: str, payload: dict) -> dict:
         url = self._base_url + path
@@ -626,7 +679,7 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "PUT")
 
     def _delete(self, path: str) -> dict:
         url = self._base_url + path
@@ -641,7 +694,7 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "DELETE")
 
     def _get(self, path: str, params: Optional[dict] = None):
         url = self._base_url + path
@@ -657,9 +710,9 @@ class SINMClient:
         except requests.RequestException as exc:
             raise APIError(0, f"Erro de conexão: {exc}") from exc
 
-        return self._handle_response(resp, path)
+        return self._handle_response(resp, path, "GET")
 
-    def _handle_response(self, resp: requests.Response, path: str = ""):
+    def _handle_response(self, resp: requests.Response, path: str = "", metodo: str = ""):
         logger.debug("Response [%s] %s: %s", resp.status_code, path, resp.text)
 
         if resp.status_code in (200, 201, 204):
@@ -679,15 +732,16 @@ class SINMClient:
             body["raw"] = raw
 
         if resp.status_code == 403:
-            roles_necessarios = _roles_para_endpoint(path)
-            roles_usuario = self._auth.roles
+            roles_necessarios, escopo = _regra_do_endpoint(path, metodo)
             raise PermissaoError(
                 resp.status_code,
                 message,
                 body,
                 endpoint=path,
-                roles_usuario=roles_usuario,
+                roles_usuario=self._auth.roles,
                 roles_necessarios=roles_necessarios,
+                roles_por_client=self._auth.client_roles,
+                escopo=escopo,
             )
         if resp.status_code == 404:
             raise NotFoundError(resp.status_code, message, body)
