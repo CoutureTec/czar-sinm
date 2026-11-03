@@ -7,6 +7,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Não lançado]
 
+## [0.3.0] — 2026-11-03
+
 ### Adicionado
 - `InterpretacaoManejo`: campo opcional `tipoOperacao` (ex.: 'ARAÇÃO', 'GRADAGEM',
   'SUBSOLAGEM', 'ESCARIFICAÇÃO'), alinhado ao `InterpretacaoManejoInput` da API.
