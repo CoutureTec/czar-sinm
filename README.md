@@ -2,52 +2,35 @@
 
 [![CI](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml/badge.svg)](https://github.com/CoutureTec/czar-sinm/actions/workflows/ci.yml)
 [![Release](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/CoutureTec/czar-sinm/actions/workflows/release.yml)
+[![PyPI](https://img.shields.io/pypi/v/czar-sinm)](https://pypi.org/project/czar-sinm/)
 
-Biblioteca Python para integração com a **SiNM** (Sistema de Informações de Níveis de Manejo).
+Biblioteca Python para integração com o **SiNM** (Sistema de Informações de Níveis de Manejo).
 
-Esta biblioteca visa compartilhar um mesmo cliente robusto em python que facilite a integração com o sistema SiNM.
+Integrar com o SiNM envolve **autenticação OAuth2** com renovação de token, **payloads extensos**,
+erros com tratamento próprio (validação, permissão, regra de negócio) e um **fluxo em etapas**
+que dependem umas das outras. O `czarsinm` cuida disso numa interface de alto nível: com poucas
+linhas, seu sistema envia glebas, análises de solo e sensoriamentos e consulta o nível de manejo,
+sem lidar com o Keycloak nem com a estrutura interna da API.
 
-Há exemplos do fluxo completo, com dados em JSON ou CSV. → [Veja os exemplos de uso](exemplos/README.md)
-
-
-# Motivação de manter uma biblioteca pública 
-
-Integrar com o SiNM envolve **autenticação OAuth2** com renovação automática de token, serialização de **payloads complexos**, tratamento diferenciado de erros por tipo (validação, permissão, recurso não encontrado) e um **fluxo de múltiplas etapas** com dependências entre si. Implementar tudo isso do zero em cada projeto **consome dias de desenvolvimento** e gera código duplicado, frágil e difícil de manter.
-
-O `czarsinm` encapsula toda essa complexidade em uma interface de alto nível: **com poucas linhas de código** seu time já está enviando glebas, análises de solo e sensoriamentos, sem precisar conhecer os detalhes do protocolo Keycloak nem a estrutura interna da API.
-
-Por ser **open-source**, a biblioteca se beneficia de múltiplos olhares: bugs são identificados mais cedo, edge cases reportados por outros integradores viram correções que todos aproveitam, e o código passa por revisão pública contínua — o que resulta em uma base mais confiável do que qualquer implementação proprietária isolada.
-
-→ [Veja os exemplos](exemplos/README.md)
-
-## Pré-requisitos
-
-- Python 3.8+
+A biblioteca é open-source: correções que um integrador reporta passam a valer para todos.
 
 ## Instalação
 
-**Via PyPI (recomendado):**
+Requer Python 3.8+.
 
 ```bash
-pip install czar-sinm
+pip install czar-sinm            # versão mais recente
+pip install czar-sinm==0.4.0     # versão fixa (recomendado em produção)
 ```
 
-**Via GitHub com tag:**
-
-```bash
-pip install git+https://github.com/CoutureTec/czar-sinm.git@v0.1.0
-```
-
+As versões e o que muda em cada uma estão no [CHANGELOG](CHANGELOG.md).
 
 ## Início rápido
 
-### Exemplos prontos
-
-O diretório [`exemplos/`](exemplos/README.md) tem o fluxo completo — autenticação,
-gleba, análise de solo química e física, sensoriamento remoto, classificação (ONM)
-e racional do cálculo — em um script para o `/api/v1` e outro para o `/api/v2`.
-Os dados vêm de uma fonte configurável (JSON ou CSV), fácil de trocar por um
-banco de dados ou outro sistema.
+O diretório [`exemplos/`](exemplos/README.md) tem o fluxo completo pronto para rodar: autenticação,
+gleba, análise de solo química e física, sensoriamento remoto, classificação (ONM) e racional
+do cálculo. Há um script para o `/api/v1` e outro para o `/api/v2`, e os dados vêm de uma fonte
+configurável (JSON ou CSV) que você troca pelo seu banco de dados ou ERP.
 
 ```bash
 cd exemplos
@@ -55,74 +38,76 @@ cp env.example .env        # preencha as credenciais
 python exemplo_v2.py       # ou exemplo_v1.py
 ```
 
-### Uso via código
+## Fluxo de integração
+
+Cada gleba passa por quatro etapas. O cadastro da gleba devolve a `chaveClassificacaoNM`,
+que liga as demais:
+
+| Etapa | Método | Resultado |
+|---|---|---|
+| 1. Gleba (talhão, produtor, propriedade, manejo, histórico, cultura-alvo) | `cadastrar_gleba` | `chaveClassificacaoNM` |
+| 2. Análise de solo química e física | `cadastrar_analise_solo_quimica` / `_fisica` | vínculo com a chave |
+| 3. Sensoriamento remoto | `cadastrar_sensoriamento_remoto` | vínculo com a chave |
+| 4. Classificação e racional | `consultar_classificacao` / `consultar_racional` | nível de manejo (NM1–NM4) e indicadores |
 
 ```python
-from czarsinm import SINMClient
-from czarsinm.exceptions import PermissaoError, APIError
+from czarsinm import AnaliseSoloFisica, AnaliseSoloQuimica, DadoGleba, SensoriamentoRemoto, SINMClient
 
-# Default: autenticação por Client Credentials (M2M).
-# username/password são aceitos no construtor mas ignorados neste fluxo.
 client = SINMClient(
-    username="usuario@exemplo.com",  # ignorado em client_credentials
-    password="senha",                # ignorado em client_credentials
-    client_id="meu-client-id",
-    client_secret="meu-client-secret",
+    username=None, password=None,          # só usados com grant_type="password"
+    client_id="00000000000000",            # CNPJ da empresa, sem máscara
+    client_secret="chave-secreta-do-client",
     ambiente="hml",
+    api_version="v2",
 )
 
-# Verifica autenticação
-print("Client roles:", client.client_roles)
+gleba = DadoGleba(...)                     # um exemplo preenchido de cada
+quimica = AnaliseSoloQuimica(...)          # modelo está em
+fisica = AnaliseSoloFisica(...)            # exemplos/dados/glebas.json e
+sensoriamento = SensoriamentoRemoto(...)   # exemplos/fonte_dados.py
 
-# Lista glebas cadastradas
-try:
-    glebas = client.listar_glebas()
-    print(f"{len(glebas)} gleba(s) encontrada(s)")
-except PermissaoError as e:
-    print(e.format_report())
-except APIError as e:
-    print(e.format_report())
+chave = client.cadastrar_gleba(gleba)["chaveClassificacaoNM"]
+client.cadastrar_analise_solo_quimica(quimica, chave_classificacao_nm=chave)
+client.cadastrar_analise_solo_fisica(fisica, chave_classificacao_nm=chave)
+client.cadastrar_sensoriamento_remoto(sensoriamento, chave_classificacao_nm=chave)
+
+classificacao = client.consultar_classificacao(chave)
+print(f"NM{classificacao['scoreFinal']}", classificacao.get("inconsistencias"))
+racional = client.consultar_racional(chave)  # disponível quando a classificação está completa
 ```
 
-#### Fluxo de autenticação
+Guarde a chave no seu sistema junto do talhão (o `Talhao.idExterno` ajuda a localizar a gleba
+depois): é com ela que você consulta o resultado mais tarde.
 
-O **default** é OAuth2 **Client Credentials** —
-o backend zarc-nm autoriza por empresa (client) usando service-account roles,
-e esse modelo só funciona com Client Credentials.
+## Autenticação
 
-Para manter o fluxo antigo (ROPC, autenticação por usuário humano), passe
-`grant_type="password"` explicitamente:
+O padrão é OAuth2 **Client Credentials**: a API autoriza por empresa (client do Keycloak,
+identificado pelo CNPJ), usando os papéis do service account.
+
+| `grant_type` | Quando usar | O que precisa |
+|---|---|---|
+| `client_credentials` (padrão) | Integração sistema a sistema | `client_id` + `client_secret` |
+| `password` | Usuário humano com papel atribuído no Keycloak | `username` + `password` + `client_id` + `client_secret` |
 
 ```python
-client = SINMClient(
-    username="usuario@exemplo.com",
-    password="senha",
-    client_id="meu-client-id",
-    client_secret="meu-client-secret",
-    ambiente="hml",
-    grant_type="password",   # opcional, default é "client_credentials"
-)
+client = SINMClient("usuario@empresa.com.br", "senha", client_id, client_secret,
+                    ambiente="hml", grant_type="password")
+
+client.client_roles    # papéis do token por empresa (CNPJ) — útil para conferir o acesso
 ```
 
-| Modo | Quando usar | O que precisa |
-|------|-------------|---------------|
-| `client_credentials` (default) | Integração M2M; backend usa SA roles cross-empresa | `client_id` + `client_secret` |
-| `password` (ROPC) | Usuário humano com role direta atribuída no Keycloak | `username` + `password` + `client_id` + `client_secret` |
+O token é obtido no primeiro uso e renovado automaticamente.
 
-`grant_type` é o último parâmetro do construtor (posicional ou por nome) —
-isso preserva compatibilidade com qualquer chamada existente.
+## Ambientes
 
-Para exemplos completos com cadastro de gleba, análise de solo e sensoriamento remoto → [exemplos/README.md](exemplos/README.md)
-
-## Estrutura da biblioteca
-
-```
-src/czarsinm/
-├── client.py       # SINMClient — métodos principais + diagnóstico de 403
-├── auth.py         # Autenticação Keycloak com cache e renovação de token
-├── models.py       # Dataclasses para os payloads da API
-└── exceptions.py   # SINMError, ValidationError, PermissaoError, ConflitoConcorrenciaError, ...
-```
+| Parâmetro | Uso |
+|---|---|
+| `ambiente="hml"` / `"prd"` | Homologação (padrão) e produção — URLs já configuradas |
+| `ambiente="<outro>"` + `base_url`, `keycloak_url`, `keycloak_realm` | Ambiente customizado |
+| `proxies={"https": "http://proxy:3128"}` | Rede que exige proxy HTTP(S) |
+| `timeout=60` | Tempo limite por requisição, em segundos |
+| `api_version="v1"` / `"v2"` | Contrato da API — ver [Contrato v2](#contrato-v2-opt-in) |
+| `tamanho_pagina=100` | Itens por requisição nos `listar_*` |
 
 ## Referência rápida da API
 
@@ -266,6 +251,8 @@ as duas com valores diferentes é erro.
 Os erros retornados pelas chamadas à api são logados de forma a tornar mais claro o possível a sua causa, baseado na documentação da API do SiNM.
 
 ```python
+import time
+
 from czarsinm.exceptions import (
     AuthenticationError,
     UsuarioNaoCadastradoError,
@@ -352,6 +339,22 @@ por client e, quando o role exigido existe em algum, indica em qual.
 ║    • talhao.area                  → deve ser positivo      ║
 ╚════════════════════════════════════════════════════════════╝
 ```
+
+## Estrutura da biblioteca
+
+```
+src/czarsinm/
+├── client.py       # SINMClient — métodos da API + diagnóstico de 403
+├── auth.py         # Autenticação Keycloak com cache e renovação de token
+├── models.py       # Dataclasses dos payloads da API
+└── exceptions.py   # SINMError, ValidationError, PermissaoError, ConflitoConcorrenciaError, ...
+```
+
+## Contribuindo
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — ambiente de desenvolvimento, testes e fluxo de PR
+- [SECURITY.md](SECURITY.md) — como reportar vulnerabilidades
+- [Issues](https://github.com/CoutureTec/czar-sinm/issues) — bugs e sugestões
 
 ## Licença
 
