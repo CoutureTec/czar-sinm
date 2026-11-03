@@ -43,10 +43,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - `CulturaAlvo` (`soja`, `milho`, `de_nome`) e as constantes `CULTURA_SOJA`/`CULTURA_MILHO`;
   campo `DadoGleba.culturaAlvo`. No v1 o alvo vai como última produção; no v2 vai em
   `culturaAlvo`, obrigatório. Sem `culturaAlvo`, a produção com as duas previsões em
-  `producoes` é promovida a alvo.
+  `producoes` é promovida a alvo — desde que sobre ao menos um cultivo no histórico.
 - Exemplos 01, 02 e 04: escolha da versão da API (`--api-version` / `SINM_API_VERSION`) e
   da cultura-alvo soja ou milho (`--cultura` / `SINM_CULTURA_ALVO`; no 02 e no 04 também
   `talhao/cultura_alvo.csv`). Novo conjunto `processo_002_milho` no exemplo 02.
+
+- `SINMClient(tamanho_pagina=100)`: itens por página nas listagens.
+- `PermissaoError.roles_por_client` e `PermissaoError.escopo` (`'client'`, `'realm'` ou `None`).
+
+### Corrigido
+- `listar_*` devolviam só a primeira página (20 itens) das listagens paginadas da API.
+  Agora percorrem todas as páginas e devolvem a lista completa
+  ([#30](https://github.com/CoutureTec/czar-sinm/issues/30)).
+- `DadoGleba.to_dict('v2')` gerava `producoes: []` quando a única produção era a
+  cultura-alvo, e a API respondia 400. Agora recusa antes da chamada com `ValueError`
+  explicando que o v2 exige ao menos um cultivo no histórico
+  ([#28](https://github.com/CoutureTec/czar-sinm/issues/28)).
+- `AnaliseSolo` (payload combinado do v1) aceitava envio sem amostras físicas, que a API
+  recusa com 400. Agora recusa antes da chamada; para enviar só a química, use
+  `AnaliseSoloQuimica` ([#29](https://github.com/CoutureTec/czar-sinm/issues/29)).
+- Relatório do 403 (`PermissaoError`) comparava os realm roles do token com os roles
+  `OPERADOR_*`, que são client roles (um client por CNPJ). Agora lista os client roles por
+  empresa e indica em quais o role exigido está
+  ([#31](https://github.com/CoutureTec/czar-sinm/issues/31)).
+- `/classificacoes` não exige role (a chave dá acesso à consulta); o relatório do 403 deixou
+  de pedir `OPERADOR_CONTRATOS` ali ([#32](https://github.com/CoutureTec/czar-sinm/issues/32)).
+- O `DELETE` de sensoriamento remoto é restrito ao realm role `ADMINISTRADOR`; o relatório do
+  403 deixou de indicar `OPERADOR_SENSORIAMENTO_REMOTO`
+  ([#33](https://github.com/CoutureTec/czar-sinm/issues/33)).
 
 ### Alterado
 - Docstring de `Cultura`: os códigos de exemplo estavam errados ('018' não é milho). Agora:
@@ -65,6 +89,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - `buscar_analise_solo(uuid)`: a rota `/api/v1/analises-solo/{uuid}` não existe em nenhum
   ambiente — o método sempre falhou. Agora emite `DeprecationWarning` e delega para
   `buscar_analise_solo_quimica`.
+- `remover_sensoriamento_remoto`: a remoção é restrita a administradores na API e responde
+  403 para integradores. Emite `DeprecationWarning`; para corrigir um sensoriamento, use
+  `atualizar_sensoriamento_remoto` ([#33](https://github.com/CoutureTec/czar-sinm/issues/33)).
 - Campo `efeitoNaNota` do racional: continua na resposta, mas compara o indicador com a
   nota *final*, então indicadores que causaram um teto saem como `NEUTRO`. Prefira
   `papelNaNota` + `contribuicao`.

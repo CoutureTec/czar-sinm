@@ -264,14 +264,18 @@ class TestAnaliseSolo:
         assert "cnpj" not in d
         assert isinstance(d["amostrasQuimicas"], list)
         assert len(d["amostrasQuimicas"]) == 1
-        assert "amostrasFisicas" not in d
+        assert len(d["amostrasFisicas"]) == 1
 
-    def test_to_dict_sem_cpf_e_cnpj(self, amostra):
-        a = AnaliseSolo(amostrasQuimicas=[amostra])
+    def test_to_dict_sem_cpf_e_cnpj(self, amostra, amostra_fisica):
+        a = AnaliseSolo(amostrasQuimicas=[amostra], amostrasFisicas=[amostra_fisica])
         d = a.to_dict()
         assert "cpfProdutor" not in d
         assert "cnpjPropriedade" not in d
         assert "cnpj" not in d
+
+    def test_combinado_exige_amostra_fisica(self, amostra):
+        with pytest.raises(ValueError, match="ao menos uma amostra física"):
+            AnaliseSolo(amostrasQuimicas=[amostra]).to_dict()
 
     def test_combinado_nao_existe_no_v2(self, analise_solo):
         with pytest.raises(ValueError, match="não existe no contrato v2"):
@@ -503,6 +507,18 @@ class TestDadoGlebaContratos:
         assert d["culturaAlvo"]["cultura"] == {"codigo": "001"}
         assert d["culturaAlvo"]["dataPrevisaoPlantio"] == "2026-10-01"
         assert all("dataPrevisaoPlantio" not in p for p in d["producoes"])
+
+    def test_v2_unica_producao_promovida_falha(self, dado_gleba):
+        atual = [p for p in dado_gleba.producoes if p.dataPrevisaoPlantio and p.dataPrevisaoColheita]
+        dado_gleba.producoes = atual
+        assert dado_gleba.to_dict("v1")["producoes"]
+        with pytest.raises(ValueError, match="ao menos uma produção no histórico"):
+            dado_gleba.to_dict("v2")
+
+    def test_v2_cultura_alvo_sem_historico_falha(self, gleba_milho):
+        gleba_milho.producoes = []
+        with pytest.raises(ValueError, match="ao menos uma produção no histórico"):
+            gleba_milho.to_dict("v2")
 
     def test_v2_sem_alvo_falha(self, dado_gleba, producao_passada):
         dado_gleba.producoes = [producao_passada]

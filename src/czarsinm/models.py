@@ -300,6 +300,10 @@ class DadoGleba:
     objeto serializa corretamente para os dois contratos (no v1 a cultura-alvo
     vira a produção atual, no fim da lista). Sem ``culturaAlvo``, a produção atual
     em ``producoes`` é promovida a cultura-alvo no v2.
+
+    No v2 o histórico precisa de ao menos um cultivo além da cultura-alvo: uma
+    gleba cuja única produção é a atual serializa no v1, mas não no v2
+    (``ValueError`` antes da chamada).
     """
     produtor: Produtor
     propriedade: Propriedade
@@ -309,8 +313,9 @@ class DadoGleba:
     coberturas: list[CoberturaSolo]
     """Mínimo 1 avaliação de cobertura obrigatória."""
     producoes: list[Producao]
-    """Histórico de cultivos (mínimo 1). Sem ``culturaAlvo``, deve conter também a
-    produção atual (com as duas previsões) — forma do v1."""
+    """Histórico de cultivos (mínimo 1, sem contar a cultura-alvo). Sem
+    ``culturaAlvo``, deve conter também a produção atual (com as duas previsões) —
+    forma do v1."""
     culturaAlvo: Optional[CulturaAlvo] = None
     """Cultura a classificar: soja ou milho grão. Ver :class:`CulturaAlvo`."""
 
@@ -356,6 +361,12 @@ class DadoGleba:
             raise ValueError(
                 "O contrato v2 exige culturaAlvo (soja ou milho grão). Informe "
                 "DadoGleba(culturaAlvo=CulturaAlvo.soja(...)) ou CulturaAlvo.milho(...)."
+            )
+        if not historico:
+            raise ValueError(
+                "O contrato v2 exige ao menos uma produção no histórico: producoes "
+                "guarda os cultivos anteriores e não inclui a cultura-alvo. Informe "
+                "o cultivo anterior da gleba em producoes."
             )
         d["culturaAlvo"] = alvo.to_dict()
         d["producoes"] = [p.to_dict() for p in historico]
@@ -600,7 +611,8 @@ class AnaliseSolo(_IdentificacaoAnalise):
     cnpjLaboratorio: Optional[str] = None
     """CNPJ do laboratório (14 dígitos). Opcional."""
     amostrasFisicas: list[AmostraFisica] = field(default_factory=list)
-    """Amostras físicas de solo. Opcional."""
+    """Mínimo 1 amostra física obrigatória no payload combinado. Para enviar só a
+    química, use :class:`AnaliseSoloQuimica` no endpoint por tipo."""
 
     def to_dict(self, contrato: str = "v1") -> dict:
         _validar_contrato(contrato)
@@ -609,9 +621,16 @@ class AnaliseSolo(_IdentificacaoAnalise):
                 "O payload combinado não existe no contrato v2. Use AnaliseSoloQuimica "
                 "e AnaliseSoloFisica nas rotas /api/v2/analises-solo/{quimica,fisica}."
             )
-        d: dict = {"amostrasQuimicas": [a.to_dict(contrato) for a in self.amostrasQuimicas]}
-        if self.amostrasFisicas:
-            d["amostrasFisicas"] = [a.to_dict(contrato) for a in self.amostrasFisicas]
+        if not self.amostrasFisicas:
+            raise ValueError(
+                "O payload combinado exige ao menos uma amostra física. Para enviar só "
+                "a análise química, use AnaliseSoloQuimica com "
+                "cadastrar_analise_solo_quimica (ou AnaliseSolo.separar())."
+            )
+        d: dict = {
+            "amostrasQuimicas": [a.to_dict(contrato) for a in self.amostrasQuimicas],
+            "amostrasFisicas": [a.to_dict(contrato) for a in self.amostrasFisicas],
+        }
         d.update(self._identificacao_dict(contrato))
         return d
 
