@@ -14,6 +14,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   `dados/glebas.json` ou as tabelas de `dados/csv/` (`SINM_FONTE`). Os exemplos antigos
   (01 a 06) foram removidos; os workflows "Validar Acessos" e "Racional do Cálculo" usam os
   novos scripts (`--autenticar` e `--chave`).
+- README reorganizado: fluxo de integração com a `chaveClassificacaoNM`, autenticação,
+  parâmetros de ambiente e instalação com versão fixa.
 
 ## [0.4.0] — 2026-11-03
 
